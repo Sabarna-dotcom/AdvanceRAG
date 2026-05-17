@@ -1,0 +1,16 @@
+2026-05-17 21:01:07,156 - __main__ - INFO - Ollama embedding model initialized successfully: bge-m3
+2026-05-17 21:01:07,156 - __main__ - INFO - Single text received. Converting to list.
+2026-05-17 21:01:07,156 - __main__ - INFO - Starting embedding generation for 1 texts
+2026-05-17 21:01:07,156 - __main__ - INFO - Processing batch 1
+2026-05-17 21:01:07,156 - __main__ - INFO - Generating embedding for text chunk
+2026-05-17 21:01:09,598 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2026-05-17 21:01:09,599 - __main__ - INFO - Batch embedding generation successful
+2026-05-17 21:01:09,599 - __main__ - INFO - Embedding generation completed successfully
+2026-05-17 21:01:09,599 - __main__ - INFO - Starting embedding generation for 2 texts
+2026-05-17 21:01:09,599 - __main__ - INFO - Processing batch 1
+2026-05-17 21:01:09,599 - __main__ - INFO - Generating embedding for text chunk
+2026-05-17 21:01:09,989 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2026-05-17 21:01:09,989 - __main__ - INFO - Generating embedding for text chunk
+2026-05-17 21:01:10,369 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2026-05-17 21:01:10,370 - __main__ - INFO - Batch embedding generation successful
+2026-05-17 21:01:10,370 - __main__ - INFO - Embedding generation completed successfully
