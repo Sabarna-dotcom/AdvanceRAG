@@ -1,0 +1,3 @@
+# to test if embedding working correctly or not
+python -m src.embeddings.embedding_model
+
