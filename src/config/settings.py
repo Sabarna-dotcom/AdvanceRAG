@@ -49,14 +49,15 @@ class Settings(BaseSettings):
     max_login_attempts: int = Field(default=5,env="MAX_LOGIN_ATTEMPTS")
     lockout_duration_minutes: int = Field(default=15,env="LOCKOUT_DURATION_MINUTES")
 
-    # ============ PINECONE VECTOR DATABASE ============
-    pinecone_api_key: str = Field(..., env="PINECONE_API_KEY")
-    pinecone_environment: str = Field(default="us-west1-gcp", env="PINECONE_ENVIRONMENT")
-    pinecone_index_name: str = Field(default="educational-rag", env="PINECONE_INDEX_NAME")
-    pinecone_dimension: int = Field(default=1024, env="PINECONE_DIMENSION")
-    pinecone_metric: str = Field(default="cosine", env="PINECONE_METRIC")
-    pinecone_namespace_pdf: str = Field(default="pdf-chunks", env="PINECONE_NAMESPACE_PDF")
-    pinecone_namespace_video: str = Field(default="video-transcripts", env="PINECONE_NAMESPACE_VIDEO")
+    # ============ QDRANT VECTOR DATABASE ============
+    qdrant_host: str = Field(default="localhost", env="QDRANT_HOST")
+    qdrant_port: int = Field(default=6333, env="QDRANT_PORT")
+    qdrant_grpc_port: int = Field(default=6334, env="QDRANT_GRPC_PORT")
+    qdrant_collection_name: str = Field(default="educational_rag", env="QDRANT_COLLECTION_NAME")
+    qdrant_vector_size: int = Field(default=1024, env="QDRANT_VECTOR_SIZE")
+    qdrant_distance: str = Field(default="Cosine", env="QDRANT_DISTANCE")
+    qdrant_pdf_collection: str = Field(default="pdf_chunks", env="QDRANT_PDF_COLLECTION")
+    qdrant_video_collection: str = Field(default="video_transcripts", env="QDRANT_VIDEO_COLLECTION")
 
     # ============ REDIS CACHE ============
     redis_host: str = Field(default="localhost", env="REDIS_HOST")

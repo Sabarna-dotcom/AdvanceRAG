@@ -1,6 +1,6 @@
 # config/vectorstore_config.py
 """
-Configuration specific to the vector store (Pinecone) module.
+Configuration specific to the vector store (Qdrant) module.
 """
 
 from pydantic import BaseModel
@@ -8,20 +8,21 @@ from src.config.settings import get_settings
 
 
 class VectorStoreConfig(BaseModel):
-    """Configuration for Pinecone vector store"""
+    """Configuration for Qdrant vector store"""
 
-    # API credentials
-    api_key: str
-    environment: str
+    # Connection settings
+    host: str
+    port: int
+    grpc_port: int
 
-    # Index settings
-    index_name: str
-    dimension: int
-    metric: str
+    # Collection settings
+    collection_name: str
+    vector_size: int
+    distance: str
 
-    # Namespaces
-    namespace_pdf: str
-    namespace_video: str
+    # Collections
+    pdf_collection: str
+    video_collection: str
 
     class Config:
         frozen = True
@@ -32,13 +33,14 @@ def get_vectorstore_config() -> VectorStoreConfig:
     settings = get_settings()
 
     return VectorStoreConfig(
-        api_key=settings.pinecone_api_key,
-        environment=settings.pinecone_environment,
-        index_name=settings.pinecone_index_name,
-        dimension=settings.pinecone_dimension,
-        metric=settings.pinecone_metric,
-        namespace_pdf=settings.pinecone_namespace_pdf,
-        namespace_video=settings.pinecone_namespace_video
+        host=settings.qdrant_host,
+        port=settings.qdrant_port,
+        grpc_port=settings.qdrant_grpc_port,
+        collection_name=settings.qdrant_collection_name,
+        vector_size=settings.qdrant_vector_size,
+        distance=settings.qdrant_distance,
+        pdf_collection=settings.qdrant_pdf_collection,
+        video_collection=settings.qdrant_video_collection
     )
 
 
@@ -49,6 +51,8 @@ _vectorstore_config = None
 def get_config() -> VectorStoreConfig:
     """Get or create vector store config singleton"""
     global _vectorstore_config
+
     if _vectorstore_config is None:
         _vectorstore_config = get_vectorstore_config()
+
     return _vectorstore_config

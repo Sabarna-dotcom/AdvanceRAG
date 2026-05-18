@@ -174,15 +174,18 @@ def test_config_integration():
         print("\n9. Testing Vector Store configuration...")
         from src.config.vectorstore_config import get_config as get_vectorstore_config
         vectorstore_config = get_vectorstore_config()
-        print(f"   Pinecone index: {vectorstore_config.index_name}")
-        print(f"   Dimension: {vectorstore_config.dimension}")
-        print(f"   Metric: {vectorstore_config.metric}")
-        print(f"   Namespace PDF: {vectorstore_config.namespace_pdf}")
-        print(f"   Namespace Video: {vectorstore_config.namespace_video}")
+        print(f"   Qdrant host: {vectorstore_config.host}")
+        print(f"   Qdrant port: {vectorstore_config.port}")
+        print(f"   Qdrant gRPC port: {vectorstore_config.grpc_port}")
+        print(f"   Collection name: {vectorstore_config.collection_name}")
+        print(f"   Vector size: {vectorstore_config.vector_size}")
+        print(f"   Distance metric: {vectorstore_config.distance}")
+        print(f"   PDF Collection: {vectorstore_config.pdf_collection}")
+        print(f"   Video Collection: {vectorstore_config.video_collection}")
         print("   ✓ Vector Store config loaded!")
 
         # Test 10: Auth config
-        print("\n7. Testing Authentication configuration...")
+        print("\n10. Testing Authentication configuration...")
         from src.config.auth_config import get_config as get_auth_config
         auth_config = get_auth_config()
         print(f"   JWT Algorithm: {auth_config.jwt_algorithm}")
