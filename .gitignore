@@ -13,3 +13,5 @@ wheels/
 .env
 
 files
+logs
+.log

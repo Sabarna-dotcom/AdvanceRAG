@@ -4,8 +4,7 @@ Configuration specific to the retrieval module.
 """
 
 from pydantic import BaseModel
-from typing import Dict
-from config.settings import get_settings
+from src.config.settings import get_settings
 
 
 class RetrievalConfig(BaseModel):

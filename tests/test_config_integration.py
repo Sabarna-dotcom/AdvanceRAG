@@ -9,8 +9,8 @@ import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.cache.config.cache_config import get_config as get_cache_config
-from src.embeddings.config.embedding_config import get_config as get_embedding_config
+from src.config.cache_config import get_config as get_cache_config
+from src.config.embedding_config import get_config as get_embedding_config
 from src.config.settings import get_settings
 import redis
 import psycopg2
@@ -82,6 +82,33 @@ def test_config_integration():
         print(f"   ✓ PostgreSQL connected: {version.split(',')[0]}")
 
         # Test insert using config-loaded connection
+        # Create test user first
+        cursor.execute("""
+            INSERT INTO users (
+                id,
+                email,
+                username,
+                password_hash,
+                full_name,
+                is_active,
+                is_verified
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING;
+        """, (
+            'test_user_config',
+            'config@test.com',
+            'config_test_user',
+            'dummy_password_hash',
+            'Config Test User',
+            True,
+            True
+        ))
+
+        conn.commit()
+
+        print("   ✓ Test user created")
+
         cursor.execute("""
             INSERT INTO conversations 
             (id, conversation_id, user_id, role, message, sources_used, metadata)
@@ -105,7 +132,7 @@ def test_config_integration():
 
         # Test 5: Retrieval config
         print("\n5. Testing Retrieval configuration...")
-        from src.retrieval.config.retrieval_config import get_config as get_retrieval_config
+        from src.config.retrieval_config import get_config as get_retrieval_config
         retrieval_config = get_retrieval_config()
         print(f"   Top-k initial: {retrieval_config.top_k_initial}")
         print(f"   Top-k final: {retrieval_config.top_k_final}")
@@ -115,9 +142,9 @@ def test_config_integration():
 
         # Test 6: LLM config
         print("\n6. Testing LLM configuration...")
-        from src.llm.config.llm_config import get_config as get_llm_config
+        from src.config.llm_config import get_config as get_llm_config
         llm_config = get_llm_config()
-        print(f"   Model: {llm_config.model}")
+        print(f"   Model: {llm_config.model_name}")
         print(f"   Temperature: {llm_config.temperature}")
         print(f"   Max tokens: {llm_config.max_tokens}")
         print(f"   Track costs: {llm_config.track_costs}")
@@ -125,7 +152,7 @@ def test_config_integration():
 
         # Test 7: Guardrails config
         print("\n7. Testing Guardrails configuration...")
-        from src.guardrails.config.guardrails_config import get_config as get_guardrails_config
+        from src.config.guardrails_config import get_config as get_guardrails_config
         guardrails_config = get_guardrails_config()
         print(f"   Max query length: {guardrails_config.input.max_query_length}")
         print(f"   Min query length: {guardrails_config.input.min_query_length}")
@@ -135,17 +162,17 @@ def test_config_integration():
 
         # Test 8: Data Ingestion config
         print("\n8. Testing Data Ingestion configuration...")
-        from src.data_ingestion.config.ingestion_config import get_config as get_ingestion_config
+        from src.config.ingestion_config import get_config as get_ingestion_config
         ingestion_config = get_ingestion_config()
-        print(f"   PDF chunk size: {ingestion_config.pdf_chunk_size}")
-        print(f"   PDF overlap: {ingestion_config.pdf_chunk_overlap}")
-        print(f"   Parent-child enabled: {ingestion_config.enable_parent_child}")
-        print(f"   Video chunk duration: {ingestion_config.video_chunk_duration}")
+        print(f"   PDF chunk size: {ingestion_config.pdf.chunk_size}")
+        print(f"   PDF overlap: {ingestion_config.pdf.chunk_overlap}")
+        print(f"   Parent-child enabled: {ingestion_config.pdf.enable_parent_child}")
+        print(f"   Video chunk duration: {ingestion_config.video.chunk_duration}")
         print("   ✓ Data Ingestion config loaded!")
 
         # Test 9: Vector Store configuration...
         print("\n9. Testing Vector Store configuration...")
-        from src.vectorstore.config.vectorstore_config import get_config as get_vectorstore_config
+        from src.config.vectorstore_config import get_config as get_vectorstore_config
         vectorstore_config = get_vectorstore_config()
         print(f"   Pinecone index: {vectorstore_config.index_name}")
         print(f"   Dimension: {vectorstore_config.dimension}")
@@ -153,6 +180,28 @@ def test_config_integration():
         print(f"   Namespace PDF: {vectorstore_config.namespace_pdf}")
         print(f"   Namespace Video: {vectorstore_config.namespace_video}")
         print("   ✓ Vector Store config loaded!")
+
+        # Test 10: Auth config
+        print("\n7. Testing Authentication configuration...")
+        from src.config.auth_config import get_config as get_auth_config
+        auth_config = get_auth_config()
+        print(f"   JWT Algorithm: {auth_config.jwt_algorithm}")
+        print(f"   Access token expiry: {auth_config.access_token_expire_minutes} min")
+        print(f"   Refresh token expiry: {auth_config.refresh_token_expire_days} days")
+
+        print(f"   Password min length: {auth_config.password_min_length}")
+        print(f"   Require special chars: {auth_config.password_require_special}")
+        print(f"   Require numbers: {auth_config.password_require_numbers}")
+        print(f"   Require uppercase: {auth_config.password_require_uppercase}")
+
+        print(f"   Max sessions/user: {auth_config.max_sessions_per_user}")
+        print(f"   Session timeout: {auth_config.session_timeout_minutes} min")
+
+        print(f"   2FA enabled: {auth_config.enable_2fa}")
+        print(f"   Max login attempts: {auth_config.max_login_attempts}")
+        print(f"   Lockout duration: {auth_config.lockout_duration_minutes} min")
+
+        print("   ✓ Authentication config loaded!")
 
         print("\n" + "=" * 60)
         print("✅ ALL CONFIGURATION INTEGRATION TESTS PASSED!")

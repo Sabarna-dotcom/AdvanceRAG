@@ -19,14 +19,35 @@ class Settings(BaseSettings):
     embedding_batch_size: int = Field(default=32,env="EMBEDDING_BATCH_SIZE")
     embedding_max_retries: int = Field(default=3,env="EMBEDDING_MAX_RETRIES")
     embedding_timeout: int = Field(default=30,env="EMBEDDING_TIMEOUT")
-    ollama_base_url: str = Field(default="http://localhost:11434",env="OLLAMA_BASE_URL")
 
-    # ============ GROQ LLM ============
-    groq_api_key: str = Field(..., env="GROQ_API_KEY")
-    groq_model: str = Field(default="llama-3.1-70b-versatile", env="GROQ_MODEL")
-    groq_temperature: float = Field(default=0.3, env="GROQ_TEMPERATURE")
-    groq_max_tokens: int = Field(default=1500, env="GROQ_MAX_TOKENS")
-    groq_timeout: int = Field(default=60, env="GROQ_TIMEOUT")
+    # ============ OLLAMA LLM ============
+    ollama_base_url: str = Field(default="http://localhost:11434",env="OLLAMA_BASE_URL")
+    ollama_llm_model: str = Field(default="llama3",env="OLLAMA_LLM_MODEL")
+    ollama_temperature: float = Field(default=0.3,env="OLLAMA_TEMPERATURE")
+    ollama_max_tokens: int = Field(default=1500,env="OLLAMA_MAX_TOKENS")
+    ollama_timeout: int = Field(default=60,env="OLLAMA_TIMEOUT")
+    llm_max_retries: int = Field(default=3,env="LLM_MAX_RETRIES")
+
+    # ============ AUTHENTICATION ============
+    jwt_secret_key: str = Field(...,env="JWT_SECRET_KEY")
+    jwt_algorithm: str = Field(default="HS256",env="JWT_ALGORITHM")
+    access_token_expire_minutes: int = Field(default=30,env="ACCESS_TOKEN_EXPIRE_MINUTES")
+    refresh_token_expire_days: int = Field(default=7,env="REFRESH_TOKEN_EXPIRE_DAYS")
+
+    # Password policy
+    password_min_length: int = Field(default=8,env="PASSWORD_MIN_LENGTH")
+    password_require_special: bool = Field(default=True,env="PASSWORD_REQUIRE_SPECIAL")
+    password_require_numbers: bool = Field(default=True,env="PASSWORD_REQUIRE_NUMBERS")
+    password_require_uppercase: bool = Field(default=True,env="PASSWORD_REQUIRE_UPPERCASE")
+
+    # Session management
+    max_sessions_per_user: int = Field(default=5,env="MAX_SESSIONS_PER_USER")
+    session_timeout_minutes: int = Field(default=60,env="SESSION_TIMEOUT_MINUTES")
+
+    # Security settings
+    enable_2fa: bool = Field(default=False,env="ENABLE_2FA")
+    max_login_attempts: int = Field(default=5,env="MAX_LOGIN_ATTEMPTS")
+    lockout_duration_minutes: int = Field(default=15,env="LOCKOUT_DURATION_MINUTES")
 
     # ============ PINECONE VECTOR DATABASE ============
     pinecone_api_key: str = Field(..., env="PINECONE_API_KEY")
@@ -118,7 +139,7 @@ class Settings(BaseSettings):
     groq_cost_per_1k_tokens: float = Field(default=0.0001, env="GROQ_COST_PER_1K_TOKENS")
     embedding_cost_per_1k: float = Field(default=0.00002, env="EMBEDDING_COST_PER_1K")
 
-    @validator("groq_temperature")
+    @validator("ollama_temperature")
     def validate_temperature(cls, v):
         """Ensure temperature is between 0 and 2"""
         if not 0 <= v <= 1:
@@ -147,6 +168,18 @@ class Settings(BaseSettings):
             return f"redis://:{password}@{host}:{port}/{db}"
         else:
             return f"redis://{host}:{port}/{db}"
+
+    @validator("password_min_length")
+    def validate_password_length(cls, v):
+        if v < 6:
+            raise ValueError("Password minimum length must be >= 6")
+        return v
+
+    @validator("max_login_attempts")
+    def validate_login_attempts(cls, v):
+        if v < 1:
+            raise ValueError("Max login attempts must be positive")
+        return v
 
     class Config:
         env_file = ".env"

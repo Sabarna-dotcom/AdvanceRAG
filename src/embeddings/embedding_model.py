@@ -1,33 +1,31 @@
-# src/embeddings/embedding_model.py
-
 """
 Local embedding model using Ollama.
 """
 
-import logging
-from typing import List, Union
+from typing import (
+    List,
+    Union
+)
 
 import ollama
 
-from src.embeddings.config.embedding_config import get_config
-
-
-# ==========================================
-# Logger Configuration
-# ==========================================
-
-logging.basicConfig(
-    filename="logs/embedding.log",
-    level=logging.INFO,
-    format=(
-        "%(asctime)s - "
-        "%(name)s - "
-        "%(levelname)s - "
-        "%(message)s"
-    )
+from src.config.embedding_config import (
+    get_config
 )
 
-logger = logging.getLogger(__name__)
+from src.utils.logger import (
+    get_logger
+)
+
+from src.utils.exceptions import (
+    LLMException
+)
+
+# ==========================================
+# Logger
+# ==========================================
+
+logger = get_logger(__name__)
 
 
 class OllamaEmbeddingModel:
@@ -36,39 +34,55 @@ class OllamaEmbeddingModel:
     """
 
     def __init__(self):
-        """Initialize embedding model configuration"""
+        """
+        Initialize embedding model.
+        """
 
         try:
 
+            logger.info(
+                "Initializing embedding model..."
+            )
+
             self.config = get_config()
 
-            # Model name from config
+            # Model name
             self.model_name = (
                 self.config.model_name
             )
 
             # Ollama client
             self.client = ollama.Client(
-                host=self.config.ollama_base_url
+
+                host=(
+                    self.config
+                    .ollama_base_url
+                )
             )
 
             logger.info(
-                f"Ollama embedding model "
-                f"initialized successfully: "
-                f"{self.model_name}"
+                f"Embedding model initialized "
+                f"successfully | "
+                f"Model: {self.model_name}"
             )
 
-        except Exception as e:
+        except Exception as error:
 
-            logger.error(
-                f"Failed to initialize "
-                f"embedding model: {e}"
+            logger.exception(
+                "Failed to initialize "
+                "embedding model."
             )
 
-            raise Exception(
-                "Embedding model initialization "
-                "failed"
-            ) from e
+            raise LLMException(
+
+                message=(
+                    "Embedding model "
+                    "initialization failed"
+                ),
+
+                details=str(error)
+
+            ) from error
 
     def embed(
         self,
@@ -78,7 +92,9 @@ class OllamaEmbeddingModel:
         Generate embeddings for text(s).
 
         Args:
-            texts: Single string or list of strings
+            texts:
+                Single string or list
+                of strings
 
         Returns:
             List of embedding vectors
@@ -86,7 +102,22 @@ class OllamaEmbeddingModel:
 
         try:
 
-            # Convert single string → list
+            # Empty validation
+            if not texts:
+
+                logger.warning(
+                    "Empty input received "
+                    "for embedding."
+                )
+
+                raise LLMException(
+                    message=(
+                        "Input texts cannot "
+                        "be empty"
+                    )
+                )
+
+            # Single text → list
             if isinstance(texts, str):
 
                 logger.info(
@@ -99,12 +130,14 @@ class OllamaEmbeddingModel:
             all_embeddings = []
 
             logger.info(
-                f"Starting embedding generation "
-                f"for {len(texts)} texts"
+                f"Starting embedding "
+                f"generation for "
+                f"{len(texts)} texts."
             )
 
             # Batch processing
             for i in range(
+
                 0,
                 len(texts),
                 self.config.batch_size
@@ -128,28 +161,40 @@ class OllamaEmbeddingModel:
                 )
 
             logger.info(
-                "Embedding generation completed "
-                "successfully"
+                "Embedding generation "
+                "completed successfully."
             )
 
             return all_embeddings
 
-        except Exception as e:
+        except LLMException:
 
-            logger.error(
-                f"Embedding generation failed: {e}"
+            raise
+
+        except Exception as error:
+
+            logger.exception(
+                "Embedding generation failed."
             )
 
-            raise Exception(
-                "Failed to generate embeddings"
-            ) from e
+            raise LLMException(
+
+                message=(
+                    "Failed to generate "
+                    "embeddings"
+                ),
+
+                details=str(error)
+
+            ) from error
 
     def _embed_batch(
         self,
         batch: List[str]
     ) -> List[List[float]]:
         """
-        Generate embeddings for a batch.
+        Generate embeddings
+        for a batch.
         """
 
         embeddings = []
@@ -158,14 +203,24 @@ class OllamaEmbeddingModel:
 
             for text in batch:
 
+                if not text.strip():
+
+                    logger.warning(
+                        "Empty text chunk skipped."
+                    )
+
+                    continue
+
                 logger.info(
                     "Generating embedding "
-                    "for text chunk"
+                    "for text chunk."
                 )
 
                 response = (
                     self.client.embeddings(
+
                         model=self.model_name,
+
                         prompt=text
                     )
                 )
@@ -176,66 +231,92 @@ class OllamaEmbeddingModel:
 
             logger.info(
                 "Batch embedding generation "
-                "successful"
+                "successful."
             )
 
             return embeddings
 
-        except Exception as e:
+        except Exception as error:
 
-            logger.error(
-                f"Batch embedding generation "
-                f"failed: {e}"
+            logger.exception(
+                "Batch embedding generation "
+                "failed."
             )
 
-            raise Exception(
-                "Failed to generate batch "
-                "embeddings"
-            ) from e
+            raise LLMException(
+
+                message=(
+                    "Failed to generate "
+                    "batch embeddings"
+                ),
+
+                details=str(error)
+
+            ) from error
 
     def get_dimension(self) -> int:
-        """Get embedding dimension"""
+        """
+        Get embedding dimension.
+        """
 
         try:
 
             logger.info(
-                "Fetching embedding dimension"
+                "Fetching embedding "
+                "dimension."
             )
 
             return self.config.dimension
 
-        except Exception as e:
+        except Exception as error:
 
-            logger.error(
-                f"Failed to fetch dimension: {e}"
+            logger.exception(
+                "Failed to fetch "
+                "embedding dimension."
             )
 
-            raise Exception(
-                "Could not get embedding "
-                "dimension"
-            ) from e
+            raise LLMException(
+
+                message=(
+                    "Could not get "
+                    "embedding dimension"
+                ),
+
+                details=str(error)
+
+            ) from error
 
     def get_model_name(self) -> str:
-        """Get model name"""
+        """
+        Get model name.
+        """
 
         try:
 
             logger.info(
-                "Fetching model name"
+                "Fetching embedding "
+                "model name."
             )
 
             return self.model_name
 
-        except Exception as e:
+        except Exception as error:
 
-            logger.error(
-                f"Failed to fetch model "
-                f"name: {e}"
+            logger.exception(
+                "Failed to fetch "
+                "model name."
             )
 
-            raise Exception(
-                "Could not get model name"
-            ) from e
+            raise LLMException(
+
+                message=(
+                    "Could not get "
+                    "model name"
+                ),
+
+                details=str(error)
+
+            ) from error
 
 
 # ==========================================
@@ -244,30 +325,50 @@ class OllamaEmbeddingModel:
 
 if __name__ == "__main__":
 
-    # Initialize embedder
-    embedder = OllamaEmbeddingModel()
+    try:
 
-    # Single text
-    embedding = embedder.embed(
-        "This is a test"
-    )
+        # Initialize embedder
+        embedder = (
+            OllamaEmbeddingModel()
+        )
 
-    print(
-        f"Single embedding dimension: "
-        f"{len(embedding[0])}"
-    )
+        # Single text
+        embedding = embedder.embed(
+            "This is a test"
+        )
 
-    # Multiple texts
-    embeddings = embedder.embed([
-        "Photosynthesis converts light into energy",
-        "The Calvin cycle is part of photosynthesis"
-    ])
+        print(
+            f"Single embedding dimension: "
+            f"{len(embedding[0])}"
+        )
 
-    print(
-        f"Generated {len(embeddings)} embeddings"
-    )
+        # Multiple texts
+        embeddings = embedder.embed([
 
-    print(
-        f"Each embedding has "
-        f"{len(embeddings[0])} dimensions"
-    )
+            "Photosynthesis converts "
+            "light into energy",
+
+            "The Calvin cycle is "
+            "part of photosynthesis"
+        ])
+
+        print(
+            f"Generated "
+            f"{len(embeddings)} embeddings"
+        )
+
+        print(
+            f"Each embedding has "
+            f"{len(embeddings[0])} "
+            f"dimensions"
+        )
+
+    except LLMException as error:
+
+        logger.error(
+            f"Application failed: {error}"
+        )
+
+        print(
+            f"Error: {error}"
+        )
