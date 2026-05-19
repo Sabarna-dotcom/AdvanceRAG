@@ -16,3 +16,11 @@ pytest
 ollama
 langchain-ollama
 qdrant-client
+langchain-text-splitters
+openai-whisper
+llama-index
+sentence-transformers
+pypdf
+pdfplumber
+
+

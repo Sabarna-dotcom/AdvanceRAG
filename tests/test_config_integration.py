@@ -164,10 +164,17 @@ def test_config_integration():
         print("\n8. Testing Data Ingestion configuration...")
         from src.config.ingestion_config import get_config as get_ingestion_config
         ingestion_config = get_ingestion_config()
-        print(f"   PDF chunk size: {ingestion_config.pdf.chunk_size}")
-        print(f"   PDF overlap: {ingestion_config.pdf.chunk_overlap}")
-        print(f"   Parent-child enabled: {ingestion_config.pdf.enable_parent_child}")
-        print(f"   Video chunk duration: {ingestion_config.video.chunk_duration}")
+
+        print(f"   PDF chunk size: "f"{ingestion_config.pdf.chunk_size}")
+        print(f"   PDF overlap: "f"{ingestion_config.pdf.chunk_overlap}")
+        print(f"   PDF parent size: "f"{ingestion_config.pdf.parent_size}")
+        print(f"   PDF child size: "f"{ingestion_config.pdf.child_size}")
+
+        print(f"   Raw PDF dir: "f"{ingestion_config.paths.raw_pdf_dir}")
+        print(f"   Processed PDF dir: "f"{ingestion_config.paths.processed_pdf_dir}")
+        print(f"   Raw Audio dir: "f"{ingestion_config.paths.raw_audio_dir}")
+        print(f"   Processed Transcript dir: "f"{ingestion_config.paths.processed_transcript_dir}")
+        print(f"   Raw VIDEO dir: "f"{ingestion_config.paths.raw_video_dir}")
         print("   ✓ Data Ingestion config loaded!")
 
         # Test 9: Vector Store configuration...

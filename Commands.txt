@@ -1,3 +1,5 @@
 # to test if embedding working correctly or not
 python -m src.embeddings.embedding_model
 
+# For video to audio to transcript processing ffmpeg is needed to instal,l in computer ans set to path
+

@@ -11,7 +11,6 @@ class PDFChunkingConfig(BaseModel):
     """Configuration for PDF chunking"""
     chunk_size: int
     chunk_overlap: int
-    enable_parent_child: bool
     parent_size: int
     child_size: int
 
@@ -29,10 +28,21 @@ class VideoChunkingConfig(BaseModel):
         frozen = True
 
 
+class PathConfig(BaseModel):
+
+    raw_pdf_dir: str
+    raw_audio_dir: str
+    raw_video_dir: str
+    processed_pdf_dir: str
+    processed_transcript_dir: str
+
+    class Config:
+        frozen = True
+
 class IngestionConfig(BaseModel):
     """Combined ingestion configuration"""
     pdf: PDFChunkingConfig
-    video: VideoChunkingConfig
+    paths: PathConfig
 
     class Config:
         frozen = True
@@ -45,20 +55,22 @@ def get_ingestion_config() -> IngestionConfig:
     pdf_config = PDFChunkingConfig(
         chunk_size=settings.pdf_chunk_size,
         chunk_overlap=settings.pdf_chunk_overlap,
-        enable_parent_child=settings.pdf_enable_parent_child,
         parent_size=settings.pdf_parent_size,
-        child_size=settings.pdf_child_size
+        child_size=settings.pdf_child_size,
     )
 
-    video_config = VideoChunkingConfig(
-        chunk_duration=settings.video_chunk_duration,
-        min_chunk_length=settings.video_min_chunk_length,
-        enable_parent_child=settings.video_enable_parent_child
+
+    path_config = PathConfig(
+        raw_pdf_dir=settings.raw_pdf_dir,
+        raw_audio_dir=settings.raw_audio_dir,
+        raw_video_dir=settings.raw_video_dir,
+        processed_pdf_dir=settings.processed_pdf_dir,
+        processed_transcript_dir=settings.processed_transcript_dir
     )
 
     return IngestionConfig(
         pdf=pdf_config,
-        video=video_config
+        paths=path_config
     )
 
 

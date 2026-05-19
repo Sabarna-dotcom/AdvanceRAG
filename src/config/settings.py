@@ -92,16 +92,19 @@ class Settings(BaseSettings):
     reranker_model: str = Field(default="cross-encoder/ms-marco-MiniLM-L-12-v2", env="RERANKER_MODEL")
     reranker_batch_size: int = Field(default=16, env="RERANKER_BATCH_SIZE")
 
-    # ============ CHUNKING CONFIGURATION ============
+    # ============ PDF CHUNKING CONFIGURATION ============
     pdf_chunk_size: int = Field(default=800, env="PDF_CHUNK_SIZE")
     pdf_chunk_overlap: int = Field(default=100, env="PDF_CHUNK_OVERLAP")
-    pdf_enable_parent_child: bool = Field(default=True, env="PDF_ENABLE_PARENT_CHILD")
     pdf_parent_size: int = Field(default=1000, env="PDF_PARENT_SIZE")
     pdf_child_size: int = Field(default=300, env="PDF_CHILD_SIZE")
 
-    video_chunk_duration: int = Field(default=180, env="VIDEO_CHUNK_DURATION")
-    video_min_chunk_length: int = Field(default=50, env="VIDEO_MIN_CHUNK_LENGTH")
-    video_enable_parent_child: bool = Field(default=True, env="VIDEO_ENABLE_PARENT_CHILD")
+    # ============ INGESTION PATHS ============
+    raw_pdf_dir: str = Field(default="data/raw/pdfs", env="RAW_PDF_DIR")
+    raw_audio_dir: str = Field(default="data/raw/audios", env="RAW_AUDIO_DIR")
+    raw_video_dir: str = Field(default="data/raw/videos", env="RAW_VIDEO_DIR")
+    processed_pdf_dir: str = Field(default="data/processed/pdfs", env="PROCESSED_PDF_DIR")
+    processed_transcript_dir: str = Field(default="data/processed/transcripts", env="PROCESSED_TRANSCRIPT_DIR")
+
 
     # ============ GUARDRAILS ============
     max_query_length: int = Field(default=500, env="MAX_QUERY_LENGTH")
