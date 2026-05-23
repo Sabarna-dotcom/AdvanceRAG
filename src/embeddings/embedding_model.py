@@ -230,9 +230,20 @@ class OllamaEmbeddingModel:
                         )
                     )
 
-                    embedding = response.get(
-                        "embedding"
-                    )
+                    # ============================
+                    # Handle both old and new
+                    # Ollama client API formats
+                    # old: response.get("embedding")
+                    # new: response.embedding or
+                    #      response["embedding"]
+                    # ============================
+
+                    if hasattr(response, "embedding"):
+                        embedding = response.embedding
+                    elif isinstance(response, dict):
+                        embedding = response.get("embedding")
+                    else:
+                        embedding = None
 
                     # ==========================
                     # Validate Embedding
