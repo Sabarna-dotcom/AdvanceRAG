@@ -4,14 +4,17 @@ __pycache__/
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
 
 # Virtual environments
-.venv
+.venv/
 
 # Environment file
 .env
 
-files
-logs
-.log
+# Ignore folders
+files/
+logs/
+
+# Log files
+*.log
