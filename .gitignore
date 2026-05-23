@@ -10,8 +10,8 @@ wheels/
 .venv
 
 # Environment file
-.env
+#.env
 
-files
-logs
+#files
+#logs
 .log
