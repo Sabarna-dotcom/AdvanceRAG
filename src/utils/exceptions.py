@@ -69,6 +69,16 @@ class DatabaseException(AppException):
     """
     pass
 
+# ==========================================
+# Vector Store Exceptions
+# ==========================================
+
+class VectorStoreException(AppException):
+    """
+    Raised for vector database errors.
+    """
+    pass
+
 
 # ==========================================
 # Validation Exceptions

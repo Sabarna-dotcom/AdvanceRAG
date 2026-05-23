@@ -2,24 +2,11 @@
 Local embedding model using Ollama.
 """
 
-from typing import (
-    List,
-    Union
-)
-
+from typing import List,Union
 import ollama
-
-from src.config.embedding_config import (
-    get_config
-)
-
-from src.utils.logger import (
-    get_logger
-)
-
-from src.utils.exceptions import (
-    LLMException
-)
+from src.config.embedding_config import get_config
+from src.utils.logger import get_logger
+from src.utils.exceptions import LLMException
 
 # ==========================================
 # Logger
@@ -40,23 +27,16 @@ class OllamaEmbeddingModel:
 
         try:
 
-            logger.info(
-                "Initializing embedding model..."
-            )
-
+            logger.info("Initializing embedding model...")
             self.config = get_config()
 
             # Model name
-            self.model_name = (
-                self.config.model_name
-            )
+            self.model_name = self.config.model_name
 
             # Ollama client
             self.client = ollama.Client(
-
                 host=(
-                    self.config
-                    .ollama_base_url
+                    self.config.ollama_base_url
                 )
             )
 
@@ -173,9 +153,7 @@ class OllamaEmbeddingModel:
 
         except Exception as error:
 
-            logger.exception(
-                "Embedding generation failed."
-            )
+            logger.exception("Embedding generation failed.")
 
             raise LLMException(
 
@@ -189,8 +167,8 @@ class OllamaEmbeddingModel:
             ) from error
 
     def _embed_batch(
-        self,
-        batch: List[str]
+            self,
+            batch: List[str]
     ) -> List[List[float]]:
         """
         Generate embeddings
@@ -201,37 +179,94 @@ class OllamaEmbeddingModel:
 
         try:
 
-            for text in batch:
+            for index, text in enumerate(batch):
 
-                if not text.strip():
+                try:
+
+                    # ==========================
+                    # Empty Validation
+                    # ==========================
+
+                    if not text:
+                        logger.warning(
+                            f"Empty text chunk "
+                            f"skipped at "
+                            f"index {index}"
+                        )
+
+                        continue
+
+                    text = str(text).strip()
+
+                    if not text:
+                        logger.warning(
+                            f"Blank text chunk "
+                            f"skipped at "
+                            f"index {index}"
+                        )
+
+                        continue
+
+                    # ==========================
+                    # Debug Logging
+                    # ==========================
+
+                    logger.info(
+                        f"Generating embedding "
+                        f"for chunk {index + 1} "
+                        f"| Length: {len(text)}"
+                    )
+
+                    # ==========================
+                    # Generate Embedding
+                    # ==========================
+
+                    response = (
+                        self.client.embeddings(
+
+                            model=self.model_name,
+
+                            prompt=text
+                        )
+                    )
+
+                    embedding = response.get(
+                        "embedding"
+                    )
+
+                    # ==========================
+                    # Validate Embedding
+                    # ==========================
+
+                    if not embedding:
+                        logger.warning(
+                            f"Empty embedding "
+                            f"received for "
+                            f"chunk {index + 1}"
+                        )
+
+                        continue
+
+                    embeddings.append(
+                        embedding
+                    )
+
+                except Exception as chunk_error:
 
                     logger.warning(
-                        "Empty text chunk skipped."
+                        f"Skipping problematic "
+                        f"chunk {index + 1} "
+                        f"| Error: "
+                        f"{chunk_error}"
                     )
 
                     continue
 
-                logger.info(
-                    "Generating embedding "
-                    "for text chunk."
-                )
-
-                response = (
-                    self.client.embeddings(
-
-                        model=self.model_name,
-
-                        prompt=text
-                    )
-                )
-
-                embeddings.append(
-                    response["embedding"]
-                )
-
             logger.info(
-                "Batch embedding generation "
-                "successful."
+                f"Batch embedding generation "
+                f"successful | "
+                f"Generated "
+                f"{len(embeddings)} embeddings."
             )
 
             return embeddings

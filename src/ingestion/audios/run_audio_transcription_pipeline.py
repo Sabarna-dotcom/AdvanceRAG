@@ -38,7 +38,7 @@ except Exception as e:
 # ==========================================
 
 audio_dir = config.paths.raw_audio_dir
-transcript_dir = config.paths.raw_transcript_dir
+transcript_dir = config.paths.processed_transcript_dir
 
 os.makedirs(transcript_dir,exist_ok=True)
 

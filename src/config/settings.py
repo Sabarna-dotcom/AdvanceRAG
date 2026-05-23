@@ -103,7 +103,7 @@ class Settings(BaseSettings):
     raw_audio_dir: str = Field(default="data/raw/audios", env="RAW_AUDIO_DIR")
     raw_video_dir: str = Field(default="data/raw/videos", env="RAW_VIDEO_DIR")
     processed_pdf_dir: str = Field(default="data/processed/pdfs", env="PROCESSED_PDF_DIR")
-    processed_transcript_dir: str = Field(default="data/processed/transcripts", env="PROCESSED_TRANSCRIPT_DIR")
+    processed_transcript_dir: str = Field(default="data/processed/audios/transcripts", env="PROCESSED_TRANSCRIPT_DIR")
 
 
     # ============ GUARDRAILS ============
