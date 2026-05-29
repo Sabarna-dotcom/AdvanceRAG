@@ -1,0 +1,246 @@
+{
+  "info": {
+    "name": "Advanced Educational RAG API",
+    "description": "Postman collection for testing the RAG API.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          },
+          "description": "Check if Qdrant and Ollama are reachable."
+        },
+        {
+          "name": "Root",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            }
+          },
+          "description": "Root endpoint - confirms API is running."
+        }
+      ]
+    },
+
+    {
+      "name": "Query - PDF",
+      "item": [
+        {
+          "name": "Simple PDF Query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"What is biotechnology?\",\n  \"collection\": \"pdf\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/query",
+              "host": ["{{base_url}}"],
+              "path": ["query"]
+            }
+          },
+          "description": "Basic PDF query. No chat history."
+        },
+
+        {
+          "name": "PDF Query - No Self Reflection (faster)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"What are the applications of biotechnology in agriculture?\",\n  \"collection\": \"pdf\",\n  \"top_k\": 10,\n  \"use_self_reflection\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/query",
+              "host": ["{{base_url}}"],
+              "path": ["query"]
+            }
+          },
+          "description": "PDF query with self-reflection disabled - faster response."
+        },
+
+        {
+          "name": "PDF Query - Follow Up (with chat history)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"What are its applications?\",\n  \"collection\": \"pdf\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true,\n  \"chat_history\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"What is biotechnology?\"\n    },\n    {\n      \"role\": \"assistant\",\n      \"content\": \"Biotechnology is the use of biological systems, living organisms, or derivatives thereof to develop products and services that improve human life.\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/query",
+              "host": ["{{base_url}}"],
+              "path": ["query"]
+            }
+          }
+        },
+
+        {
+          "name": "PDF Query - Multi Turn Chat History",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n \"query\": \"Can you explain recombinant DNA technology in more detail?\",\n \"collection\": \"pdf\",\n \"top_k\": 10,\n \"use_self_reflection\": true,\n \"chat_history\": [\n   {\n     \"role\": \"user\",\n     \"content\": \"What is biotechnology?\"\n   },\n   {\n     \"role\": \"assistant\",\n     \"content\": \"Biotechnology is the use of biological systems to develop products.\"\n   },\n   {\n     \"role\": \"user\",\n     \"content\": \"What are its applications in medicine?\"\n   },\n   {\n     \"role\": \"assistant\",\n     \"content\": \"In medicine, biotechnology is used for drug production via recombinant DNA technology.\"\n   }\n ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/query",
+              "host": ["{{base_url}}"],
+              "path": ["query"]
+            },
+            "description": "Multi-turn conversation - 2 previous exchanges passed as history."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+  "name": "Query - Audio",
+  "item": [
+    {
+      "name": "Simple Audio Query",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n \"query\": \"What is HTML?\",\n \"collection\": \"audio\",\n \"top_k\": 10,\n \"use_self_reflection\": true\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/query",
+          "host": ["{{base_url}}"],
+          "path": ["query"]
+        },
+        "description": "Query against audio/transcript collection only. Citations will show start/end timestamps."
+      },
+      "response": []
+    },
+            {
+      "name": "Audio Query - Follow Up (with chat history)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n \"query\": \"How do I create my first website with HTML?\",\n \"collection\": \"audio\",\n \"top_k\": 10,\n \"use_self_reflection\": true,\n \"chat_history\": [\n   {\n     \"role\": \"user\",\n     \"content\": \"What is HTML?\"\n   },\n   {\n     \"role\": \"assistant\",\n     \"content\": \"HTML stands for HyperText Markup Language. It is the standard language for creating web pages.\"\n   }\n ]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/query",
+          "host": ["{{base_url}}"],
+          "path": ["query"]
+        },
+        "description": "Follow-up audio query with chat history."
+      },
+      "response": []
+    }
+  ]
+},
+
+    {
+  "name": "Query - Both Collections",
+  "item": [
+    {
+      "name": "Search Both PDF and Audio",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n \"query\": \"What is web development?\",\n \"top_k\": 10,\n \"use_self_reflection\": true\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/query",
+          "host": ["{{base_url}}"],
+          "path": ["query"]
+        },
+        "description": "No collection specified - searches both PDF and audio collections. Mixed citations in response."
+      },
+      "response": []
+    },
+            {
+      "name": "Search Both - With Chat History",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n \"query\": \"Give me more details about that.\",\n \"top_k\": 10,\n \"use_self_reflection\": false,\n \"chat_history\": [\n   {\n     \"role\": \"user\",\n     \"content\": \"What is web development?\"\n   },\n   {\n     \"role\": \"assistant\",\n     \"content\": \"Web development involves building websites and web applications using HTML, CSS, and JavaScript.\"\n   }\n ]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/query",
+          "host": ["{{base_url}}"],
+          "path": ["query"]
+        },
+        "description": "Follow-up across both collections."
+      },
+      "response": []
+    }
+  ]
+}
+  ]
+}
