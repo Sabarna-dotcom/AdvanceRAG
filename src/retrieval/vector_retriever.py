@@ -134,10 +134,16 @@ class VectorRetriever:
 
                 try:
 
-                    hits = self.client.search(
-                        collection_name=col,
-                        query_vector=query_embedding,
-                        limit=top_k,
+                    # hits = self.client.search(
+                    #     collection_name=col,
+                    #     query_vector=query_embedding,
+                    #     limit=top_k,
+                    # )
+
+                    hits = self._search(
+                        col,
+                        query_embedding,
+                        top_k,
                     )
 
                     for hit in hits:
@@ -204,3 +210,31 @@ class VectorRetriever:
     ) -> List[Dict]:
         """Retrieve from audio collection only."""
         return self.retrieve(query, top_k=top_k, collection="audio")
+
+    def _search(self, collection_name: str, query_vector: list, top_k: int):
+        """
+        Unified search that works with both:
+            - qdrant-client >= 1.7 -> uses .query_points()
+            - qdrant-client < 1.7 -> uses .search()
+
+        Always returns a list of ScoredPoint objects.
+        """
+
+        # Try new API first (>= 1.7)
+        if hasattr(self.client, "query_points"):
+            response = self.client.query_points(
+                collection_name=collection_name,
+                query=query_vector,
+                limit=top_k,
+                with_payload=True,
+            )
+
+            # query_points returns a QueryResponse with a .points attribute
+            return response.points
+
+        # Fallback: old API (< 1.7)
+        return self.client.search(
+            collection_name=collection_name,
+            query_vector=query_vector,
+            limit=top_k,
+        )

@@ -89,3 +89,14 @@ class ValidationException(AppException):
     Raised for validation errors.
     """
     pass
+
+# ===========================================
+# Generation Exceptions
+# ===========================================
+
+class GenerationException(AppException):
+    """
+    Raised for generation-layer errors.
+    """
+
+    pass

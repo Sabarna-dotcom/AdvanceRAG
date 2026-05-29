@@ -56,8 +56,9 @@ class Settings(BaseSettings):
     qdrant_collection_name: str = Field(default="educational_rag", env="QDRANT_COLLECTION_NAME")
     qdrant_vector_size: int = Field(default=1024, env="QDRANT_VECTOR_SIZE")
     qdrant_distance: str = Field(default="Cosine", env="QDRANT_DISTANCE")
-    qdrant_pdf_collection: str = Field(default="pdf_chunks", env="QDRANT_PDF_COLLECTION")
-    qdrant_video_collection: str = Field(default="video_transcripts", env="QDRANT_VIDEO_COLLECTION")
+    qdrant_pdf_collection: str = Field(default="pdf_collection",env="QDRANT_PDF_COLLECTION")
+    qdrant_video_collection: str = Field(default="audio_collection",env="QDRANT_VIDEO_COLLECTION")
+
 
     # ============ REDIS CACHE ============
     redis_host: str = Field(default="localhost", env="REDIS_HOST")
