@@ -21,6 +21,8 @@ openai-whisper
 sentence-transformers
 flashrank
 rank-bm25
+ragas
+datasets
 
 
 
