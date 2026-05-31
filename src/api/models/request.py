@@ -65,3 +65,13 @@ class QueryRequest(BaseModel):
         default=True,
         description="Whether to run self-reflection after generation. Set false for faster responses."
     )
+
+    session_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Session ID for persistent chat memory (Redis). "
+            "If provided, chat history is loaded/saved automatically — "
+            "no need to send chat_history manually. "
+            "If omitted, a new session is created and returned in the response."
+        )
+    )

@@ -119,6 +119,11 @@ class QueryResponse(BaseModel):
         description="Self reflection scores if enabled."
     )
 
+    session_id: Optional[str] = Field(
+        default=None,
+        description="Session ID for continuing the conversation. Pass this back in the next request."
+    )
+
 
 class HealthResponse(BaseModel):
     """Response body for GET /health."""

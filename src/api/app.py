@@ -12,7 +12,7 @@ Docs:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routes import health, query
+from src.api.routes import health, query, session
 from src.api.middleware.error_handler import (
     global_exception_handler,
     llm_exception_handler,
@@ -85,6 +85,11 @@ app.include_router(
 app.include_router(
     query.router,
     tags=["Query"],
+)
+
+app.include_router(
+    session.router,
+    tags=["Session"],
 )
 
 # =====================================================
