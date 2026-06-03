@@ -1,0 +1,529 @@
+{
+  "info": {
+    "name": "RAG API — Core (Health + Session + Query)",
+    "description": "Core RAG API endpoints: Health, Session management, and Query (PDF / Audio / Both).\n\n=== SETUP ===\n1. Set base_url variable (default: http://localhost:8000)\n2. Start: docker-compose up -d qdrant redis && ollama serve\n3. Run: uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000\n\n=== QUICK START ===\n1. GET  /health         — verify services are up\n2. POST /session        — create session (auto-saved to {{session_id}})\n3. POST /query          — ask a question\n4. GET  /session/{id}   — inspect chat history\n\n=== COLLECTIONS ===\n- 'pdf'   → PDF chunks (citations: filename + page)\n- 'audio' → Transcripts (citations: title + start/end time)\n- omit    → Both collections",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "session_id",
+      "value": "",
+      "type": "string",
+      "description": "Auto-populated by Create Session."
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('status field exists', function() { pm.expect(json).to.have.property('status'); });",
+                  "pm.test('qdrant field is boolean', function() { pm.expect(json.qdrant).to.be.a('boolean'); });",
+                  "pm.test('ollama field is boolean', function() { pm.expect(json.ollama).to.be.a('boolean'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] },
+            "description": "Check if Qdrant and Ollama are reachable. status='ok' or 'degraded'."
+          },
+          "response": [
+            {
+              "name": "200 OK — All services up",
+              "status": "OK", "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"status\": \"ok\",\n  \"qdrant\": true,\n  \"ollama\": true,\n  \"details\": null\n}"
+            },
+            {
+              "name": "200 OK — Degraded (Ollama down)",
+              "status": "OK", "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"status\": \"degraded\",\n  \"qdrant\": true,\n  \"ollama\": false,\n  \"details\": {\"ollama_error\": \"Connection refused\"}\n}"
+            }
+          ]
+        },
+        {
+          "name": "Root",
+          "request": {
+            "method": "GET", "header": [],
+            "url": { "raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""] }
+          },
+          "response": []
+        },
+        {
+          "name": "Swagger Docs",
+          "request": {
+            "method": "GET", "header": [],
+            "url": { "raw": "{{base_url}}/docs", "host": ["{{base_url}}"], "path": ["docs"] },
+            "description": "Open in browser for interactive Swagger UI."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Session",
+      "item": [
+        {
+          "name": "Create Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.session_id) {",
+                  "    pm.collectionVariables.set('session_id', json.session_id);",
+                  "    console.log('session_id saved:', json.session_id);",
+                  "}",
+                  "pm.test('Session created', function() {",
+                  "    pm.expect(json.session_id).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST", "header": [],
+            "url": { "raw": "{{base_url}}/session", "host": ["{{base_url}}"], "path": ["session"] },
+            "description": "Create a new Redis session. session_id auto-saved to {{session_id}}."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK", "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"session_id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"message\": \"Session created successfully.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Session Info",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('session_id matches', function() { pm.expect(json.session_id).to.equal(pm.collectionVariables.get('session_id')); });",
+                  "pm.test('history is array', function() { pm.expect(json.history).to.be.an('array'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET", "header": [],
+            "url": { "raw": "{{base_url}}/session/{{session_id}}", "host": ["{{base_url}}"], "path": ["session", "{{session_id}}"] },
+            "description": "Get session metadata and full chat history."
+          },
+          "response": []
+        },
+        {
+          "name": "Clear Session History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('message exists', function() { pm.expect(pm.response.json()).to.have.property('message'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST", "header": [],
+            "url": { "raw": "{{base_url}}/session/{{session_id}}/clear", "host": ["{{base_url}}"], "path": ["session", "{{session_id}}", "clear"] },
+            "description": "Clear history but keep session alive."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.collectionVariables.set('session_id', '');",
+                  "console.log('session_id cleared.');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE", "header": [],
+            "url": { "raw": "{{base_url}}/session/{{session_id}}", "host": ["{{base_url}}"], "path": ["session", "{{session_id}}"] },
+            "description": "Permanently delete session from Redis."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Query — PDF",
+      "item": [
+        {
+          "name": "PDF Query — Simple (No Session)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.session_id) { pm.collectionVariables.set('session_id', json.session_id); }",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('has_answer exists', function() { pm.expect(json).to.have.property('has_answer'); });",
+                  "pm.test('cited_sources is array', function() { pm.expect(json.cited_sources).to.be.an('array'); });",
+                  "pm.test('session_id returned', function() { pm.expect(json.session_id).to.be.a('string').and.not.empty; });",
+                  "pm.test('answer is string', function() { pm.expect(json.answer).to.be.a('string').and.not.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What is biotechnology?\",\n  \"collection\": \"pdf\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] },
+            "description": "PDF query — no session. New session auto-created, session_id saved to variable."
+          },
+          "response": [
+            {
+              "name": "200 OK — PDF answer with citations",
+              "status": "OK", "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"answer\": \"Biotechnology is the use of biological systems [Source 1].\",\n  \"cited_sources\": [{\"index\": 1, \"source_type\": \"pdf\", \"title\": \"10. Biotechnology and its Application.pdf\", \"page\": 1, \"start_time\": null, \"end_time\": null, \"preview\": \"Biotechnology essentially deals with...\"}],\n  \"cited_indices\": [1],\n  \"has_answer\": true,\n  \"iterations\": 1,\n  \"reflection\": {\"overall_confidence\": 0.87},\n  \"session_id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "PDF Query — With Session (Memory)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('answer returned', function() { pm.expect(json.answer).to.be.a('string').and.not.empty; });",
+                  "pm.test('session_id matches', function() { pm.expect(json.session_id).to.equal(pm.collectionVariables.get('session_id')); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What is biotechnology?\",\n  \"collection\": \"pdf\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true,\n  \"session_id\": \"{{session_id}}\"\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] }
+          },
+          "response": []
+        },
+        {
+          "name": "PDF Query — Follow Up (Session Memory)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('answer not empty', function() { pm.expect(json.answer).to.be.a('string').and.not.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What are its applications in agriculture?\",\n  \"collection\": \"pdf\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true,\n  \"session_id\": \"{{session_id}}\"\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] },
+            "description": "'its' resolves to biotechnology via Redis session memory."
+          },
+          "response": []
+        },
+        {
+          "name": "PDF Query — No Self Reflection (Faster)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"Explain recombinant DNA technology.\",\n  \"collection\": \"pdf\",\n  \"top_k\": 10,\n  \"use_self_reflection\": false,\n  \"session_id\": \"{{session_id}}\"\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] },
+            "description": "Faster — no self-reflection loop. reflection field will be null."
+          },
+          "response": []
+        },
+        {
+          "name": "PDF Query — High Top K (Broad Retrieval)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"Explain all applications of biotechnology in detail.\",\n  \"collection\": \"pdf\",\n  \"top_k\": 20,\n  \"use_self_reflection\": true,\n  \"session_id\": \"{{session_id}}\"\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Query — Audio",
+      "item": [
+        {
+          "name": "Audio Query — Simple (No Session)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.session_id) { pm.collectionVariables.set('session_id', json.session_id); }",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('cited_sources is array', function() { pm.expect(json.cited_sources).to.be.an('array'); });",
+                  "pm.test('Audio sources have timestamps', function() {",
+                  "    json.cited_sources.forEach(function(src) {",
+                  "        if (src.source_type === 'audio') {",
+                  "            pm.expect(src.start_time).to.not.be.null;",
+                  "            pm.expect(src.end_time).to.not.be.null;",
+                  "        }",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What is HTML?\",\n  \"collection\": \"audio\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] },
+            "description": "Audio query — citations show lecture title + start_time and end_time (MM:SS)."
+          },
+          "response": [
+            {
+              "name": "200 OK — Audio with timestamps",
+              "status": "OK", "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"answer\": \"HTML stands for HyperText Markup Language [Source 1].\",\n  \"cited_sources\": [{\"index\": 1, \"source_type\": \"audio\", \"title\": \"Your First HTML Website\", \"page\": null, \"start_time\": \"02:15\", \"end_time\": \"03:45\", \"preview\": \"From today's video we will learn about HTML...\"}],\n  \"has_answer\": true,\n  \"iterations\": 1,\n  \"session_id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Audio Query — With Session (Memory)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What is HTML?\",\n  \"collection\": \"audio\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true,\n  \"session_id\": \"{{session_id}}\"\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Audio Query — Follow Up (Session Memory)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"How do I create my first website with it?\",\n  \"collection\": \"audio\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true,\n  \"session_id\": \"{{session_id}}\"\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] },
+            "description": "'it' resolves to HTML from previous turn."
+          },
+          "response": []
+        },
+        {
+          "name": "Audio Query — Sigma Web Dev Course",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What topics are covered in the Sigma Web Development course?\",\n  \"collection\": \"audio\",\n  \"top_k\": 10,\n  \"use_self_reflection\": false\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Query — Both Collections",
+      "item": [
+        {
+          "name": "Both — Simple (No Collection Filter)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.session_id) { pm.collectionVariables.set('session_id', json.session_id); }",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('answer is string', function() { pm.expect(json.answer).to.be.a('string'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What is web development?\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] },
+            "description": "No collection filter — searches both PDF and audio. Citations mixed."
+          },
+          "response": []
+        },
+        {
+          "name": "Both — With Session Memory",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What is web development?\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true,\n  \"session_id\": \"{{session_id}}\"\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Both — Follow Up (Session Memory)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"Give me more details about that.\",\n  \"top_k\": 10,\n  \"use_self_reflection\": false,\n  \"session_id\": \"{{session_id}}\"\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] },
+            "description": "'that' resolves via session memory."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Full Conversation Flow (Run In Order)",
+      "item": [
+        {
+          "name": "Step 1 — Create Session",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "if (json.session_id) { pm.collectionVariables.set('session_id', json.session_id); console.log('session_id saved:', json.session_id); }", "pm.test('Session created', function() { pm.expect(json.session_id).to.be.a('string').and.not.empty; });"], "type": "text/javascript"}}],
+          "request": { "method": "POST", "header": [], "url": { "raw": "{{base_url}}/session", "host": ["{{base_url}}"], "path": ["session"] } },
+          "response": []
+        },
+        {
+          "name": "Step 2 — First Question (PDF)",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Has answer', function() { pm.expect(json.has_answer).to.be.true; });", "pm.test('Has cited sources', function() { pm.expect(json.cited_sources.length).to.be.above(0); });", "pm.test('Has session_id', function() { pm.expect(json.session_id).to.be.a('string'); });"], "type": "text/javascript"}}],
+          "request": {
+            "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What is biotechnology?\",\n  \"collection\": \"pdf\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true,\n  \"session_id\": \"{{session_id}}\"\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Step 3 — Follow Up Question",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Has answer', function() { pm.expect(json.has_answer).to.be.true; });", "pm.test('Answer is string', function() { pm.expect(json.answer).to.be.a('string').and.not.empty; });"], "type": "text/javascript"}}],
+          "request": {
+            "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What are its applications in medicine?\",\n  \"collection\": \"pdf\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true,\n  \"session_id\": \"{{session_id}}\"\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Step 4 — Inspect Session History",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Session exists', function() { pm.expect(json.exists).to.be.true; });", "pm.test('History has turns', function() { pm.expect(json.history.length).to.be.above(0); });", "pm.test('query_count > 0', function() { pm.expect(json.meta.query_count).to.be.above(0); });"], "type": "text/javascript"}}],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/session/{{session_id}}", "host": ["{{base_url}}"], "path": ["session", "{{session_id}}"] } },
+          "response": []
+        },
+        {
+          "name": "Step 5 — Clear History",
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('Status 200', function() { pm.response.to.have.status(200); });"], "type": "text/javascript"}}],
+          "request": { "method": "POST", "header": [], "url": { "raw": "{{base_url}}/session/{{session_id}}/clear", "host": ["{{base_url}}"], "path": ["session", "{{session_id}}", "clear"] } },
+          "response": []
+        },
+        {
+          "name": "Step 6 — Delete Session",
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.collectionVariables.set('session_id', '');"], "type": "text/javascript"}}],
+          "request": { "method": "DELETE", "header": [], "url": { "raw": "{{base_url}}/session/{{session_id}}", "host": ["{{base_url}}"], "path": ["session", "{{session_id}}"] } },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Edge Cases",
+      "item": [
+        {
+          "name": "Empty Query (422)",
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('Returns 422', function() { pm.response.to.have.status(422); });"], "type": "text/javascript"}}],
+          "request": {
+            "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"\",\n  \"collection\": \"pdf\"\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid Collection (422)",
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('Returns 422', function() { pm.response.to.have.status(422); });"], "type": "text/javascript"}}],
+          "request": {
+            "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What is HTML?\",\n  \"collection\": \"video\"\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Non-Existent Session",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('exists is false', function() { pm.expect(json.exists).to.be.false; });", "pm.test('history is empty', function() { pm.expect(json.history).to.deep.equal([]); });"], "type": "text/javascript"}}],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/session/non-existent-id-00000", "host": ["{{base_url}}"], "path": ["session", "non-existent-id-00000"] } },
+          "response": []
+        },
+        {
+          "name": "Delete Non-Existent Session (404)",
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('Returns 404', function() { pm.response.to.have.status(404); });"], "type": "text/javascript"}}],
+          "request": { "method": "DELETE", "header": [], "url": { "raw": "{{base_url}}/session/non-existent-id-00000", "host": ["{{base_url}}"], "path": ["session", "non-existent-id-00000"] } },
+          "response": []
+        },
+        {
+          "name": "Query — Out of Domain (No Answer)",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('has_answer is false', function() { pm.expect(json.has_answer).to.be.false; });"], "type": "text/javascript"}}],
+          "request": {
+            "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What is the price of Bitcoin in 2026?\",\n  \"collection\": \"pdf\",\n  \"top_k\": 10,\n  \"use_self_reflection\": false\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Query — top_k Max (50)",
+          "request": {
+            "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"Summarize everything about biotechnology.\",\n  \"collection\": \"pdf\",\n  \"top_k\": 50,\n  \"use_self_reflection\": false\n}", "options": {"raw": {"language": "json"}} },
+            "url": { "raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"] }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+ 

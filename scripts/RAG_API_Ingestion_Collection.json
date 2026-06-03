@@ -1,0 +1,64 @@
+{
+  "info": {
+    "name": "RAG API — Ingestion",
+    "description": "Ingestion pipeline endpoints. Set base_url variable (default: http://localhost:8000).\n\nFLOW: GET /ingest/status → POST /ingest/all → DELETE /cache/flush\n\nExpected after full ingestion:\n- pdf_collection: ~387 points\n- audio_collection: ~1937 points",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [{"key": "base_url", "value": "http://localhost:8000", "type": "string"}],
+  "item": [
+    {
+      "name": "1. Check Qdrant Collections",
+      "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('qdrant_reachable is boolean', function() { pm.expect(json.qdrant_reachable).to.be.a('boolean'); });", "pm.test('collections is array', function() { pm.expect(json.collections).to.be.an('array'); });", "if (json.qdrant_reachable) { json.collections.forEach(function(c) { console.log(' -', c.name, ':', c.points, 'points'); }); }"], "type": "text/javascript"}}],
+      "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}/ingest/status", "host": ["{{base_url}}"], "path": ["ingest", "status"]}, "description": "Check Qdrant collections and point counts. Run this before any ingestion."},
+      "response": [{"name": "200 OK", "status": "OK", "code": 200, "header": [{"key": "Content-Type", "value": "application/json"}], "body": "{\n  \"collections\": [{\"name\": \"pdf_collection\", \"points\": 387}, {\"name\": \"audio_collection\", \"points\": 1937}],\n  \"qdrant_reachable\": true\n}"}]
+    },
+    {
+      "name": "2. Ingest PDFs",
+      "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('results is array', function() { pm.expect(json.results).to.be.an('array'); });", "pm.test('overall_status exists', function() { pm.expect(json).to.have.property('overall_status'); });", "pm.test('total_chunks_indexed is number', function() { pm.expect(json.total_chunks_indexed).to.be.a('number'); });", "var r = json.results.find(function(x) { return x.pipeline === 'pdf'; });", "if (r) { pm.test('PDF status valid', function() { pm.expect(['success','failed']).to.include(r.status); }); pm.test('PDF duration is number', function() { pm.expect(r.duration_seconds).to.be.a('number'); }); console.log('PDF:', r.status, '|', r.chunks_indexed, 'chunks |', r.duration_seconds + 's'); if (r.status === 'failed') console.warn('FAILED:', r.message); }"], "type": "text/javascript"}}],
+      "request": {"method": "POST", "header": [], "url": {"raw": "{{base_url}}/ingest/pdf", "host": ["{{base_url}}"], "path": ["ingest", "pdf"]}, "description": "Embed + index PDF chunks into Qdrant pdf_collection.\n1. Reads data/processed/pdfs/chunks/pdf_chunks.json\n2. Embeds via bge-m3\n3. Upserts into Qdrant\n\nAfter success: run DELETE /cache/flush"},
+      "response": [{"name": "200 OK — Success", "status": "OK", "code": 200, "header": [{"key": "Content-Type", "value": "application/json"}], "body": "{\n  \"results\": [{\"pipeline\": \"pdf\", \"status\": \"success\", \"chunks_indexed\": 387, \"duration_seconds\": 45.2, \"message\": \"PDF ingestion completed. 387 chunks indexed.\"}],\n  \"total_chunks_indexed\": 387,\n  \"overall_status\": \"success\"\n}"}]
+    },
+    {
+      "name": "3. Ingest Audio Transcripts",
+      "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('results is array', function() { pm.expect(json.results).to.be.an('array'); });", "pm.test('overall_status exists', function() { pm.expect(json).to.have.property('overall_status'); });", "var r = json.results.find(function(x) { return x.pipeline === 'audio'; });", "if (r) { pm.test('Audio status valid', function() { pm.expect(['success','failed']).to.include(r.status); }); pm.test('Audio duration is number', function() { pm.expect(r.duration_seconds).to.be.a('number'); }); console.log('Audio:', r.status, '|', r.chunks_indexed, 'chunks |', r.duration_seconds + 's'); if (r.status === 'failed') console.warn('FAILED:', r.message); }"], "type": "text/javascript"}}],
+      "request": {"method": "POST", "header": [], "url": {"raw": "{{base_url}}/ingest/audio", "host": ["{{base_url}}"], "path": ["ingest", "audio"]}, "description": "Embed + index audio transcripts into Qdrant audio_collection.\n1. Reads data/processed/audios/*.json\n2. Embeds via bge-m3\n3. Upserts into Qdrant\n\nAfter success: run DELETE /cache/flush"},
+      "response": [{"name": "200 OK — Success", "status": "OK", "code": 200, "header": [{"key": "Content-Type", "value": "application/json"}], "body": "{\n  \"results\": [{\"pipeline\": \"audio\", \"status\": \"success\", \"chunks_indexed\": 1937, \"duration_seconds\": 120.5, \"message\": \"Audio ingestion completed. 1937 chunks indexed.\"}],\n  \"total_chunks_indexed\": 1937,\n  \"overall_status\": \"success\"\n}"}]
+    },
+    {
+      "name": "4. Ingest All (PDF + Audio)",
+      "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('results has 2 entries', function() { pm.expect(json.results.length).to.equal(2); });", "pm.test('overall_status is string', function() { pm.expect(json.overall_status).to.be.a('string'); });", "pm.test('total_chunks_indexed is number', function() { pm.expect(json.total_chunks_indexed).to.be.a('number'); });", "pm.test('both pipelines present', function() { var p = json.results.map(function(r) { return r.pipeline; }); pm.expect(p).to.include('pdf'); pm.expect(p).to.include('audio'); });", "console.log('Overall:', json.overall_status, '| Total chunks:', json.total_chunks_indexed);", "if (json.overall_status !== 'failed') console.log('Done. Run DELETE /cache/flush to clear stale answers.');"], "type": "text/javascript"}}],
+      "request": {"method": "POST", "header": [], "url": {"raw": "{{base_url}}/ingest/all", "host": ["{{base_url}}"], "path": ["ingest", "all"]}, "description": "Run both pipelines. overall_status: success/partial/failed.\nAfter completion: DELETE /cache/flush"},
+      "response": [{"name": "200 OK — Both success", "status": "OK", "code": 200, "header": [{"key": "Content-Type", "value": "application/json"}], "body": "{\n  \"results\": [\n    {\"pipeline\": \"pdf\", \"status\": \"success\", \"chunks_indexed\": 387, \"duration_seconds\": 45.2, \"message\": \"PDF ingestion completed.\"},\n    {\"pipeline\": \"audio\", \"status\": \"success\", \"chunks_indexed\": 1937, \"duration_seconds\": 120.5, \"message\": \"Audio ingestion completed.\"}\n  ],\n  \"total_chunks_indexed\": 2324,\n  \"overall_status\": \"success\"\n}"}]
+    },
+    {
+      "name": "5. Full Re-index Flow (Run In Order)",
+      "item": [
+        {
+          "name": "Step 1 — Check Before",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Qdrant reachable', function() { pm.expect(json.qdrant_reachable).to.be.true; });", "json.collections.forEach(function(c) { console.log('BEFORE:', c.name, '-', c.points, 'points'); });"], "type": "text/javascript"}}],
+          "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}/ingest/status", "host": ["{{base_url}}"], "path": ["ingest", "status"]}},
+          "response": []
+        },
+        {
+          "name": "Step 2 — Ingest All",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('not failed', function() { pm.expect(json.overall_status).to.not.equal('failed'); });", "console.log('Ingest done:', json.overall_status, '|', json.total_chunks_indexed, 'chunks');"], "type": "text/javascript"}}],
+          "request": {"method": "POST", "header": [], "url": {"raw": "{{base_url}}/ingest/all", "host": ["{{base_url}}"], "path": ["ingest", "all"]}},
+          "response": []
+        },
+        {
+          "name": "Step 3 — Flush Cache",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "console.log('Cache flushed. Keys deleted:', json.deleted_keys);"], "type": "text/javascript"}}],
+          "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}/cache/flush", "host": ["{{base_url}}"], "path": ["cache", "flush"]}, "description": "Clear stale cached answers after re-indexing."},
+          "response": []
+        },
+        {
+          "name": "Step 4 — Verify After",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Qdrant reachable', function() { pm.expect(json.qdrant_reachable).to.be.true; });", "json.collections.forEach(function(c) { console.log('AFTER:', c.name, '-', c.points, 'points'); });"], "type": "text/javascript"}}],
+          "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}/ingest/status", "host": ["{{base_url}}"], "path": ["ingest", "status"]}},
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+ 

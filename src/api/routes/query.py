@@ -74,29 +74,74 @@ async def query(request: QueryRequest) -> QueryResponse:
         logger.info(f"POST /query | new session | session_id={session_id}")
 
     # ------------------------------------------
-    # Step 2: Retrieve + Generate
+    # Step 2: Cache check — skip pipeline on HIT
     # ------------------------------------------
-    from src.generation.generation_manager import GenerationManager
-    from src.retrieval.retrieval_manager import RetrievalManager
+    from src.memory.cache_manager import CacheManager
 
-    # Retrieve
-    retriever = RetrievalManager()
-    chunks = retriever.retrieve(
-        query=request.query,
-        chat_history=chat_history,
-        collection=request.collection,
-        top_k=request.top_k,
-    )
+    cache = CacheManager()
+    cached_result = None
+    query_embedding_for_cache = None
 
-    # Generate
-    manager = GenerationManager(use_self_reflection=request.use_self_reflection)
-    result = manager.generate(
+    # 2a: Exact match
+    cached_result = cache.get_query_result(
         query=request.query,
-        chunks=chunks,
-        chat_history=chat_history,
-        retriever=retriever,
         collection=request.collection,
     )
+
+    # 2b: Semantic match (if no exact hit) — need embedding of the query
+    if cached_result is None:
+        try:
+            from src.embeddings.embedding_model import OllamaEmbeddingModel
+            _emb_model = OllamaEmbeddingModel()
+            _embs = _emb_model.embed([request.query])
+            if _embs:
+                query_embedding_for_cache = _embs[0]
+                cached_result = cache.get_semantic_query_result(
+                    query_embedding=query_embedding_for_cache,
+                    collection=request.collection,
+                )
+        except Exception as _ce:
+            logger.warning(f"POST /query | cache embedding lookup failed: {_ce}")
+
+    if cached_result is not None:
+        logger.info(
+            f"POST /query | CACHE HIT — skipping retrieval+generation | "
+            f"session_id={session_id}"
+        )
+        result = cached_result
+    else:
+        # ------------------------------------------
+        # Step 2c: Full pipeline — Retrieve + Generate
+        # ------------------------------------------
+        from src.generation.generation_manager import GenerationManager
+        from src.retrieval.retrieval_manager import RetrievalManager
+
+        # Retrieve
+        retriever = RetrievalManager()
+        chunks = retriever.retrieve(
+            query=request.query,
+            chat_history=chat_history,
+            collection=request.collection,
+            top_k=request.top_k,
+        )
+
+        # Generate
+        manager = GenerationManager(use_self_reflection=request.use_self_reflection)
+        result = manager.generate(
+            query=request.query,
+            chunks=chunks,
+            chat_history=chat_history,
+            retriever=retriever,
+            collection=request.collection,
+        )
+
+        # Store result in cache for future requests
+        cache.set_query_result(
+            query=request.query,
+            collection=request.collection,
+            result=result,
+            query_embedding=query_embedding_for_cache,
+        )
 
     # ------------------------------------------
     # Step 3: Save exchange to Redis memory
@@ -118,7 +163,7 @@ async def query(request: QueryRequest) -> QueryResponse:
                 source_type=src.get("source_type", "unknown"),
                 title=src.get("title", "Unknown"),
                 page=src.get("page"),
-                start_time=src.get("start_time"),
+               start_time=src.get("start_time"),
                 end_time=src.get("end_time"),
                 preview=src.get("preview"),
             )

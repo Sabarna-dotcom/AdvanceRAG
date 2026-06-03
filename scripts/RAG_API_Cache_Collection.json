@@ -1,0 +1,97 @@
+{
+  "info": {
+    "name": "RAG API — Cache",
+    "description": "Redis cache management endpoints.\n\nSet base_url variable (default: http://localhost:8000)\n\n=== HOW CACHE WORKS ===\nLayer 1 — Exact query match: same question returns instantly (TTL: 24h)\nLayer 2 — Embedding cache: same text skips Ollama embed call (TTL: 7 days)\nLayer 3 — Semantic cache: near-duplicate questions (cosine >= 0.95) also hit cache\n\n=== WHEN TO FLUSH ===\n- After re-ingesting new documents\n- After changing prompts or retrieval settings\n- For debugging (force fresh answers)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [{"key": "base_url", "value": "http://localhost:8000", "type": "string"}],
+  "item": [
+    {
+      "name": "1. Cache Stats",
+      "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('redis_reachable is boolean', function() { pm.expect(json.redis_reachable).to.be.a('boolean'); });", "pm.test('query_cache_count is number', function() { pm.expect(json.query_cache_count).to.be.a('number'); });", "pm.test('embedding_cache_count is number', function() { pm.expect(json.embedding_cache_count).to.be.a('number'); });", "pm.test('semantic_index_count is number', function() { pm.expect(json.semantic_index_count).to.be.a('number'); });", "pm.test('similarity_threshold is number', function() { pm.expect(json.similarity_threshold).to.be.a('number'); });", "if (json.redis_reachable) { pm.test('Redis reachable', function() { pm.expect(json.redis_reachable).to.be.true; }); console.log('Query cache:', json.query_cache_count); console.log('Embedding cache:', json.embedding_cache_count); console.log('Semantic index:', json.semantic_index_count); console.log('TTL query (h):', json.ttl_query_seconds / 3600); console.log('TTL emb (days):', json.ttl_embedding_seconds / 86400); }"], "type": "text/javascript"}}],
+      "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}/cache/stats", "host": ["{{base_url}}"], "path": ["cache", "stats"]}, "description": "Get Redis cache statistics.\n\nFields:\n- query_cache_count     — cached full RAG answers\n- embedding_cache_count — cached text embeddings\n- semantic_index_count  — entries in semantic similarity index\n- ttl_query_seconds     — 86400 = 24h default\n- ttl_embedding_seconds — 604800 = 7 days default\n- similarity_threshold  — 0.95 cosine similarity for semantic hit\n\nTIP: Ask same question twice then check — query_cache_count +1"},
+      "response": [
+        {"name": "200 OK — Stats", "status": "OK", "code": 200, "header": [{"key": "Content-Type", "value": "application/json"}], "body": "{\n  \"redis_reachable\": true,\n  \"query_cache_count\": 3,\n  \"embedding_cache_count\": 0,\n  \"semantic_index_count\": 3,\n  \"ttl_query_seconds\": 86400,\n  \"ttl_embedding_seconds\": 604800,\n  \"similarity_threshold\": 0.95\n}"},
+        {"name": "200 OK — Redis not reachable", "status": "OK", "code": 200, "header": [{"key": "Content-Type", "value": "application/json"}], "body": "{\n  \"redis_reachable\": false,\n  \"query_cache_count\": 0,\n  \"embedding_cache_count\": 0,\n  \"semantic_index_count\": 0,\n  \"ttl_query_seconds\": 0,\n  \"ttl_embedding_seconds\": 0,\n  \"similarity_threshold\": 0.95\n}"}
+      ]
+    },
+    {
+      "name": "2. Verify Cache Hit (Run Same Query Twice)",
+      "event": [
+        {"listen": "prerequest", "script": {"exec": ["console.log('Run this request, then run it again. Second run should be faster.');", "console.log('Then check GET /cache/stats — query_cache_count should increase by 1.');"], "type": "text/javascript"}},
+        {"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('has_answer exists', function() { pm.expect(json).to.have.property('has_answer'); });", "pm.test('answer is string', function() { pm.expect(json.answer).to.be.a('string').and.not.empty; });", "console.log('Done. Run this same request AGAIN — second run should be faster (cache hit).');"], "type": "text/javascript"}}
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"query\": \"What is biotechnology?\",\n  \"collection\": \"pdf\",\n  \"top_k\": 10,\n  \"use_self_reflection\": false\n}", "options": {"raw": {"language": "json"}}},
+        "url": {"raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"]},
+        "description": "Verify caching:\n1. Run (1st time) — full RAG pipeline runs, result stored in cache\n2. Check GET /cache/stats — query_cache_count = 1\n3. Run SAME request again — returns instantly from cache\n4. Compare response times"
+      },
+      "response": []
+    },
+    {
+      "name": "3. Flush All Cache",
+      "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('deleted_keys is number', function() { pm.expect(json.deleted_keys).to.be.a('number'); });", "pm.test('message exists', function() { pm.expect(json.message).to.be.a('string').and.not.empty; });", "console.log('Cache flushed. Keys deleted:', json.deleted_keys);", "console.log('Run GET /cache/stats to confirm counts = 0.');"], "type": "text/javascript"}}],
+      "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}/cache/flush", "host": ["{{base_url}}"], "path": ["cache", "flush"]}, "description": "Delete ALL cache keys from Redis.\n\nSafe: does NOT touch chat sessions (session: prefix).\n\nWhen to use:\n- After re-ingesting new documents\n- After changing prompts/retrieval\n- For debugging"},
+      "response": [
+        {"name": "200 OK — Flushed", "status": "OK", "code": 200, "header": [{"key": "Content-Type", "value": "application/json"}], "body": "{\n  \"deleted_keys\": 12,\n  \"message\": \"Cache flushed. 12 keys deleted.\"\n}"},
+        {"name": "200 OK — Already empty", "status": "OK", "code": 200, "header": [{"key": "Content-Type", "value": "application/json"}], "body": "{\n  \"deleted_keys\": 0,\n  \"message\": \"Cache flushed. 0 keys deleted.\"\n}"}
+      ]
+    },
+    {
+      "name": "4. Invalidate Specific Query",
+      "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('message exists', function() { pm.expect(json.message).to.be.a('string').and.not.empty; });", "console.log(json.message);"], "type": "text/javascript"}}],
+      "request": {
+        "method": "DELETE",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"query\": \"What is biotechnology?\",\n  \"collection\": \"pdf\"\n}", "options": {"raw": {"language": "json"}}},
+        "url": {"raw": "{{base_url}}/cache/query", "host": ["{{base_url}}"], "path": ["cache", "query"]},
+        "description": "Remove cache for ONE specific question.\nUseful when one answer is stale but you don't want to flush everything.\n\nOmit collection to invalidate the 'all collections' version."
+      },
+      "response": [{"name": "200 OK", "status": "OK", "code": 200, "header": [{"key": "Content-Type", "value": "application/json"}], "body": "{\n  \"message\": \"Cache invalidated for query: 'What is biotechnology?'\"\n}"}]
+    },
+    {
+      "name": "5. Verify Empty After Flush",
+      "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('query_cache_count is 0', function() { pm.expect(json.query_cache_count).to.equal(0); });", "pm.test('semantic_index_count is 0', function() { pm.expect(json.semantic_index_count).to.equal(0); });", "console.log('Cache empty confirmed. query_cache_count:', json.query_cache_count);"], "type": "text/javascript"}}],
+      "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}/cache/stats", "host": ["{{base_url}}"], "path": ["cache", "stats"]}, "description": "Run AFTER flush to confirm cache is empty. query_cache_count and semantic_index_count should both be 0."},
+      "response": []
+    },
+    {
+      "name": "6. Cache Verification Flow (Run In Order)",
+      "item": [
+        {
+          "name": "Step 1 — Stats Before",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Redis reachable', function() { pm.expect(json.redis_reachable).to.be.true; });", "pm.globals.set('cache_count_before', json.query_cache_count);", "console.log('BEFORE query_cache_count:', json.query_cache_count);"], "type": "text/javascript"}}],
+          "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}/cache/stats", "host": ["{{base_url}}"], "path": ["cache", "stats"]}},
+          "response": []
+        },
+        {
+          "name": "Step 2 — Run Query (Warm Cache)",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "pm.test('has_answer exists', function() { pm.expect(json).to.have.property('has_answer'); });", "console.log('Query done. Check cache stats — count should have increased by 1.');"], "type": "text/javascript"}}],
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"query\": \"What is biotechnology?\",\n  \"collection\": \"pdf\",\n  \"top_k\": 10,\n  \"use_self_reflection\": false\n}", "options": {"raw": {"language": "json"}}}, "url": {"raw": "{{base_url}}/query", "host": ["{{base_url}}"], "path": ["query"]}},
+          "response": []
+        },
+        {
+          "name": "Step 3 — Stats After (Count +1)",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "var before = pm.globals.get('cache_count_before') || 0;", "pm.test('Cache count increased by 1', function() { pm.expect(json.query_cache_count).to.equal(parseInt(before) + 1); });", "console.log('BEFORE:', before, '| AFTER:', json.query_cache_count);"], "type": "text/javascript"}}],
+          "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}/cache/stats", "host": ["{{base_url}}"], "path": ["cache", "stats"]}},
+          "response": []
+        },
+        {
+          "name": "Step 4 — Flush + Verify Empty",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('Status 200', function() { pm.response.to.have.status(200); });", "console.log('Flushed', json.deleted_keys, 'keys.');"], "type": "text/javascript"}}],
+          "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}/cache/flush", "host": ["{{base_url}}"], "path": ["cache", "flush"]}},
+          "response": []
+        },
+        {
+          "name": "Step 5 — Confirm Empty",
+          "event": [{"listen": "test", "script": {"exec": ["var json = pm.response.json();", "pm.test('query_cache_count is 0', function() { pm.expect(json.query_cache_count).to.equal(0); });", "pm.test('semantic_index_count is 0', function() { pm.expect(json.semantic_index_count).to.equal(0); });", "pm.globals.unset('cache_count_before');", "console.log('Cache empty confirmed. Flow complete.');"], "type": "text/javascript"}}],
+          "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}/cache/stats", "host": ["{{base_url}}"], "path": ["cache", "stats"]}},
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+ 
