@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 
 class PDFIndexingManager:
 
-    def __init__(self):
+    def _init_(self):
 
         try:
 
@@ -63,7 +63,8 @@ class PDFIndexingManager:
     def index_chunks(
         self,
         chunks: List[Dict]
-    ):
+    ) -> List[str]:
+        """Index chunks into Qdrant. Returns list of UUID point IDs assigned."""
 
         try:
 
@@ -83,13 +84,15 @@ class PDFIndexingManager:
                 f"PDF chunks."
             )
 
-            self.vector_db.upload_chunks(
+            point_ids = self.vector_db.upload_chunks(
                 chunks
             )
 
             logger.info(
                 "PDF indexing completed."
             )
+
+            return point_ids
 
         except VectorStoreException:
 

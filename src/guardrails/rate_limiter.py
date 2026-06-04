@@ -57,7 +57,7 @@ class RateLimiter:
     _HOUR_TTL = 3600
     _DAY_TTL  = 86400
 
-    def _init_(self):
+    def __init__(self):
         self.config     = get_config().rate_limit
         mem_config      = get_memory_config()
 

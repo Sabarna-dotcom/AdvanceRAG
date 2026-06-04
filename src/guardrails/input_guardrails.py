@@ -94,7 +94,7 @@ class InputGuardrails:
             raise HTTPException(400, result.reason)
     """
 
-    def _init_(self):
+    def __init__(self):
         self.config = get_config().input
         logger.info("InputGuardrails initialized.")
 

@@ -50,7 +50,7 @@ class OutputGuardrails:
             # flag or regenerate
     """
 
-    def _init_(self):
+    def __init__(self):
         self.config = get_config().output
         logger.info("OutputGuardrails initialized.")
 

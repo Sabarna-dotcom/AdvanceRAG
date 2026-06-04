@@ -31,7 +31,7 @@ class AudioIndexingManager:
     Handles audio transcript indexing.
     """
 
-    def __init__(self):
+    def _init_(self):
 
         try:
 
@@ -69,10 +69,10 @@ class AudioIndexingManager:
     def index_chunks(
         self,
         chunks: List[Dict]
-    ):
+    ) -> List[str]:
         """
-        Upload transcript embeddings
-        into Qdrant.
+        Upload transcript embeddings into Qdrant.
+        Returns list of UUID point IDs assigned.
         """
 
         try:
@@ -93,7 +93,7 @@ class AudioIndexingManager:
                 f"audio transcript chunks."
             )
 
-            self.vector_db.upload_chunks(
+            point_ids = self.vector_db.upload_chunks(
                 chunks
             )
 
@@ -101,6 +101,8 @@ class AudioIndexingManager:
                 "Audio transcript indexing "
                 "completed."
             )
+
+            return point_ids
 
         except VectorStoreException:
 

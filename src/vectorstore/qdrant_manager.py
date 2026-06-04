@@ -2,6 +2,7 @@
 Qdrant vector database manager.
 """
 
+import uuid
 from typing import List, Dict
 
 from qdrant_client import QdrantClient
@@ -10,6 +11,10 @@ from qdrant_client.models import (
     Distance,
     VectorParams,
     PointStruct,
+    PointIdsList,
+    Filter,
+    FieldCondition,
+    MatchValue,
 )
 
 from src.config.vectorstore_config import (
@@ -34,7 +39,7 @@ logger = get_logger(__name__)
 
 class QdrantManager:
 
-    def __init__(
+    def _init_(
         self,
         collection_name: str
     ):
@@ -138,7 +143,8 @@ class QdrantManager:
     def upload_chunks(
             self,
             chunks: List[Dict]
-    ):
+    ) -> List[str]:
+        """Upload chunks to Qdrant. Returns list of UUID strings assigned to each point."""
 
         try:
 
@@ -148,12 +154,16 @@ class QdrantManager:
                 f"{self.collection_name}"
             )
 
-            points = []
+            points     = []
+            point_ids  = []
 
-            for idx, chunk in enumerate(chunks):
+            for chunk in chunks:
+                point_id = str(uuid.uuid4())
+                point_ids.append(point_id)
+
                 point = PointStruct(
 
-                    id=idx,
+                    id=point_id,
 
                     vector=chunk["embedding"],
 
@@ -224,6 +234,8 @@ class QdrantManager:
                 "Chunk upload successful."
             )
 
+            return point_ids
+
         except Exception as error:
 
             logger.exception(
@@ -239,3 +251,51 @@ class QdrantManager:
                 details=str(error)
 
             ) from error
+
+    def delete_by_ids(self, point_ids: List[str]):
+        """Delete specific points by their Qdrant point IDs."""
+        if not point_ids:
+            return
+        try:
+            self.client.delete(
+                collection_name=self.collection_name,
+                points_selector=PointIdsList(points=point_ids),
+            )
+            logger.info(
+                f"Deleted {len(point_ids)} points from {self.collection_name}."
+            )
+        except Exception as error:
+            logger.exception("delete_by_ids failed.")
+            raise VectorStoreException(
+                message="Failed to delete points by IDs",
+                details=str(error),
+            ) from error
+
+    def delete_by_source(self, source_filename: str):
+        """
+        Delete ALL points whose metadata.source matches source_filename.
+        Used as a fallback when exact point IDs are not tracked.
+        """
+        try:
+            self.client.delete(
+                collection_name=self.collection_name,
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(
+                            key="metadata.source",
+                            match=MatchValue(value=source_filename),
+                        )
+                    ]
+                ),
+            )
+            logger.info(
+                f"Deleted points for source='{source_filename}' "
+                f"from {self.collection_name}."
+            )
+        except Exception as error:
+            logger.exception("delete_by_source failed.")
+            raise VectorStoreException(
+                message="Failed to delete points by source",
+                details=str(error),
+            ) from error
+ 

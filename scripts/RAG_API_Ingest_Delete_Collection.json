@@ -1,0 +1,69 @@
+{
+  "info": {
+    "name": "RAG API — Ingest Delete & Wipe",
+    "description": "Test delete and wipe ingestion endpoints.\n\nSETUP: Set base_url variable (default: http://localhost:8000)\n\n⚠️ WARNING: DELETE /ingest/wipe and POST /ingest/reindex will permanently delete all Qdrant vectors.\n\nSAFE flow:    1 → 2\nDESTRUCTIVE:  1 → 3 or 4",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Check Status (safe)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/ingest/status",
+          "host": ["{{base_url}}"],
+          "path": ["ingest", "status"]
+        },
+       "description": "Check Qdrant collections and tracker state. Always run this first to see what data exists before any delete/wipe."
+      }
+    },
+    {
+      "name": "2. Delete One File (safe)",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"filename\": \"biotech.pdf\",\n  \"collection\": \"pdf\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/ingest/file",
+          "host": ["{{base_url}}"],
+          "path": ["ingest", "file"]
+        },
+        "description": "Delete vectors for a single file from Qdrant and remove it from the tracker.\n\ncollection: 'pdf' or 'audio'\nfilename: exact filename as stored (e.g. 'biotech.pdf' or 'lecture.mp3.json')\n\nThis is safe — only affects the one file specified."
+      }
+    },
+    {
+      "name": "3. Wipe ALL Vectors ⚠️ DESTRUCTIVE",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/ingest/wipe",
+          "host": ["{{base_url}}"],
+          "path": ["ingest", "wipe"]
+        },
+        "description": "⚠️ DESTRUCTIVE — Deletes ALL vectors from both pdf_collection and audio_collection and resets both tracker state files.\n\nDoes NOT re-ingest. After this, run POST /ingest/all or POST /ingest/reindex to re-populate."
+      }
+    },
+    {
+      "name": "4. Wipe + Re-ingest ⚠️ DESTRUCTIVE + SLOW",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/ingest/reindex",
+          "host": ["{{base_url}}"],
+          "path": ["ingest", "reindex"]
+        },
+        "description": "⚠️ DESTRUCTIVE + SLOW — Wipes all vectors and immediately re-ingests all PDF and audio files from scratch.\n\nThis may take several minutes depending on number of files.\nAfter completion, run DELETE /cache/flush to clear stale cached answers."
+      }
+    }
+  ]
+}
+ 
