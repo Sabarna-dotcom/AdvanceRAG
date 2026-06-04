@@ -1,0 +1,195 @@
+{
+  "info": {
+    "_postman_id": "rag-session-flow-minimal",
+    "name": "RAG — Session Flow",
+    "description": "Minimal flow: Health → Create Session → Query → Follow-up → Cache Hit → Cache Stats → Session History → Cleanup\n\nSet base_url collection variable before running (default: http://localhost:8000)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "session_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health Check",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/health"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "console.log(pm.response.json());"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Create Session",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/session"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('session_id', body.session_id);",
+              "console.log('session_id saved:', body.session_id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. First Query (PDF)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"What is biotechnology and its applications?\",\n  \"collection\": \"pdf\",\n  \"session_id\": \"{{session_id}}\",\n  \"top_k\": 5,\n  \"use_self_reflection\": false\n}"
+        },
+        "url": "{{base_url}}/query"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('Has answer', () => pm.expect(body.has_answer).to.be.true);",
+              "console.log('cached:', body.cached);",
+              "console.log('sources:', body.cited_sources.length);",
+              "console.log('answer:', body.answer.substring(0, 200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Follow-up Question (memory test)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"What are they used for in agriculture?\",\n  \"collection\": \"pdf\",\n  \"session_id\": \"{{session_id}}\",\n  \"top_k\": 5,\n  \"use_self_reflection\": false\n}"
+        },
+        "url": "{{base_url}}/query"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "console.log('answer (should mention agriculture/biotech):', body.answer.substring(0, 300));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Repeat First Query (cache hit)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"What is biotechnology and its applications?\",\n  \"collection\": \"pdf\",\n  \"session_id\": \"{{session_id}}\",\n  \"top_k\": 5,\n  \"use_self_reflection\": false\n}"
+        },
+        "url": "{{base_url}}/query"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('Cache HIT', () => pm.expect(body.cached).to.be.true);",
+              "console.log('cached:', body.cached, '<-- must be true');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Cache Stats",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/cache/stats"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "console.log('query_cache_count:', body.query_cache_count);",
+              "console.log('embedding_cache_count:', body.embedding_cache_count);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Session History",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/session/{{session_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "console.log('history turns:', body.history.length);",
+              "body.history.forEach((t,i) => console.log([${i+1}] ${t.role}:, (t.content||'').substring(0,80)));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Delete Session (cleanup)",
+      "request": {
+        "method": "DELETE",
+        "url": "{{base_url}}/session/{{session_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('session_id', '');",
+              "console.log(pm.response.json());"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

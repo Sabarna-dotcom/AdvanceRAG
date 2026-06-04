@@ -11,8 +11,10 @@ Docs:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.api.routes import health, query, session, ingestion, cache
+from src.api.middleware.rate_limit import rate_limit_middleware
 from src.api.middleware.error_handler import (
     global_exception_handler,
     llm_exception_handler,
@@ -53,6 +55,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ==========================================
+# Rate Limit Middleware
+# ==========================================
+
+app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limit_middleware)
 
 # =====================================================
 # Exception Handlers

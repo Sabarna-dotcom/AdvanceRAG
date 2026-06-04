@@ -124,6 +124,16 @@ class QueryResponse(BaseModel):
         description="Session ID for continuing the conversation. Pass this back in the next request."
     )
 
+    cached: Optional[bool] = Field(
+        default=False,
+        description="True if this response was served from cache."
+    )
+
+    guardrail_warnings: Optional[List[str]] = Field(
+        default=None,
+        description="Output guardrail warnings e.g. possible hallucination, invalid citations."
+    )
+
 
 class HealthResponse(BaseModel):
     """Response body for GET /health."""

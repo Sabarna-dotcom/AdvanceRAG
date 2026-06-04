@@ -196,4 +196,6 @@ async def query(request: QueryRequest) -> QueryResponse:
         iterations=result.get("iterations", 1),
         reflection=reflection,
         session_id=session_id,
+        cached=result.get("cached", False),
+        guardrail_warnings=result.get("guardrail_warnings") or None,
     )
