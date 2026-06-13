@@ -3,9 +3,13 @@ Query route — the main RAG endpoint.
 POST /query — takes a question and returns an answer with citations.
 """
 
-from fastapi import APIRouter
+import time
+from typing import Optional
+
+from fastapi import APIRouter, Depends
 from src.api.models.request import QueryRequest
 from src.api.models.response import QueryResponse, CitedSource, ReflectionResult
+from src.auth.dependencies import get_optional_user
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -24,7 +28,10 @@ router = APIRouter()
         "If no collection is specified, both PDF and audio sources are searched."
     ),
 )
-async def query(request: QueryRequest) -> QueryResponse:
+async def query(
+    request: QueryRequest,
+    current_user: Optional[dict] = Depends(get_optional_user),
+) -> QueryResponse:
     """
     Full RAG pipeline:
     1. Load or create session memory from Redis
@@ -32,14 +39,17 @@ async def query(request: QueryRequest) -> QueryResponse:
     3. Build context with citations
     4. Generate answer via Ollama LLM
     5. Self-reflection + corrective loop (if enabled)
-    6. Save exchange to Redis memory
-    7. Return structured answer with cited sources + session_id
+    6. Save exchange to Redis + PostgreSQL
+    7. Save query log to PostgreSQL
+    8. Return structured answer with cited sources + session_id
     """
+    start_time = time.time()
+    user_id    = current_user["user_id"] if current_user else None
 
     logger.info(
         f"POST /query | query='{request.query[:80]}' | "
         f"collection={request.collection} | top_k={request.top_k} | "
-        f"session_id={request.session_id}"
+        f"session_id={request.session_id} | user_id={user_id}"
     )
 
     # ------------------------------------------
@@ -60,7 +70,7 @@ async def query(request: QueryRequest) -> QueryResponse:
         )
     else:
         # New session — create it
-        session_id = memory.create_session()
+        session_id = memory.create_session(user_id=user_id)
         chat_history = []
 
         # If client sent manual chat_history (old-style), use it as seed
@@ -144,13 +154,36 @@ async def query(request: QueryRequest) -> QueryResponse:
         )
 
     # ------------------------------------------
-    # Step 3: Save exchange to Redis memory
+    # Step 3: Save exchange to Redis + PostgreSQL
     # ------------------------------------------
     memory.append_exchange(
-        session_id=session_id,
-        user_query=request.query,
-        assistant_answer=result["answer"],
+        session_id       = session_id,
+        user_query       = request.query,
+        assistant_answer = result["answer"],
+        user_id          = user_id,
+        sources          = result.get("cited_sources"),
     )
+
+    # ------------------------------------------
+    # Step 3b: Save query log to PostgreSQL (non-blocking)
+    # ------------------------------------------
+    try:
+        from src.memory.postgres_memory import PostgresMemory
+        pg = PostgresMemory()
+        if pg.is_available:
+            latency_ms = int((time.time() - start_time) * 1000)
+            pg.save_query_log(
+                conversation_id    = session_id,
+                query              = request.query,
+                user_id            = user_id,
+                response           = result["answer"],
+                retrieval_count    = len(result.get("cited_sources", [])),
+                sources_used       = result.get("cited_sources"),
+                latency_ms         = latency_ms,
+                cache_hit          = result.get("cached", False),
+            )
+    except Exception as _qle:
+        logger.warning(f"POST /query | query log save failed (non-critical): {_qle}")
 
     # ------------------------------------------
     # Step 4: Build response
@@ -163,7 +196,7 @@ async def query(request: QueryRequest) -> QueryResponse:
                 source_type=src.get("source_type", "unknown"),
                 title=src.get("title", "Unknown"),
                 page=src.get("page"),
-               start_time=src.get("start_time"),
+                start_time=src.get("start_time"),
                 end_time=src.get("end_time"),
                 preview=src.get("preview"),
             )

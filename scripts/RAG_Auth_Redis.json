@@ -1,0 +1,135 @@
+{
+  "info": {
+    "name": "RAG API — Full Auth Flow",
+    "description": "Complete flow: Register → Login → Session → Query → Follow-up → Refresh → Logout.\n\nHOW TO USE:\n1. Set the 'base_url' collection variable to your server (default: http://localhost:8000)\n2. Run requests in order 01 → 11\n3. Tokens and session_id are auto-captured — no manual copy-paste needed.\n\nNOTE: Requires Redis running (docker-compose up -d redis) for session endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",      "value": "http://localhost:8000" },
+    { "key": "access_token",  "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "session_id",    "value": "" },
+    { "key": "user_id",       "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 — Health Check",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Server is healthy', function () { pm.response.to.have.status(200); console.log('Health:', pm.response.json().status); });"], "type": "text/javascript" } }],
+      "request": { "method": "GET", "header": [], "url": "{{base_url}}/health" }
+    },
+    {
+      "name": "02 — Register New User",
+      "event": [{ "listen": "test", "script": { "exec": ["var code = pm.response.code;", "if (code === 200 || code === 201) {", "    var json = pm.response.json();", "    pm.collectionVariables.set('user_id', json.user_id);", "    pm.test('User registered', function () { pm.expect(json.user_id).to.be.a('string'); });", "    console.log('Registered user_id:', json.user_id);", "} else {", "    pm.test('Register skipped (user may exist, proceed to login)', function () { pm.expect([200,201,400]).to.include(code); });", "    console.log('Register response:', pm.response.text());", "}"], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"username\": \"testuser\",\n  \"password\": \"Test@1234\",\n  \"full_name\": \"Test User\"\n}" },
+        "url": "{{base_url}}/auth/register"
+      }
+    },
+    {
+      "name": "03 — Login",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Login successful', function () {", "    pm.response.to.have.status(200);", "    var json = pm.response.json();", "    pm.collectionVariables.set('access_token',  json.access_token);", "    pm.collectionVariables.set('refresh_token', json.refresh_token);", "    pm.collectionVariables.set('user_id',       json.user_id);", "    console.log('access_token captured:', json.access_token.substring(0,40)+'...');", "    console.log('user_id:', json.user_id);", "});"], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"password\": \"Test@1234\"\n}" },
+        "url": "{{base_url}}/auth/login"
+      }
+    },
+    {
+      "name": "04 — Get My Profile",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Got user profile', function () { pm.response.to.have.status(200); console.log('Profile:', JSON.stringify(pm.response.json())); });"], "type": "text/javascript" } }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "{{base_url}}/auth/me"
+      }
+    },
+    {
+      "name": "05 — Create Session",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Session created', function () {", "    pm.response.to.have.status(200);", "    var json = pm.response.json();", "    pm.expect(json.session_id).to.be.a('string');", "    pm.collectionVariables.set('session_id', json.session_id);", "    console.log('session_id:', json.session_id);", "});"], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "{{base_url}}/session"
+      }
+    },
+    {
+      "name": "06 — RAG Query (with session)",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Query returned a response', function () {", "    pm.response.to.have.status(200);", "    var json = pm.response.json();", "    pm.expect(json.answer).to.be.a('string');", "    pm.collectionVariables.set('session_id', json.session_id);", "    console.log('Answer:', json.answer.substring(0,200));", "    console.log('has_answer:', json.has_answer, '| sources:', json.cited_sources ? json.cited_sources.length : 0, '| cached:', json.cached);", "});"], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "body": { "mode": "raw", "raw": "{\n  \"query\": \"What is biotechnology and its applications?\",\n  \"session_id\": \"{{session_id}}\",\n  \"top_k\": 10,\n  \"use_self_reflection\": true\n}" },
+        "url": "{{base_url}}/query"
+      }
+    },
+    {
+      "name": "07 — Follow-up Question (same session)",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Follow-up answered', function () {", "    pm.response.to.have.status(200);", "    var json = pm.response.json();", "    pm.expect(json.answer).to.be.a('string');", "    console.log('Follow-up:', json.answer.substring(0,200));", "    console.log('iterations:', json.iterations);", "});"], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "body": { "mode": "raw", "raw": "{\n  \"query\": \"Can you give me examples from agriculture specifically?\",\n  \"session_id\": \"{{session_id}}\",\n  \"top_k\": 10,\n  \"use_self_reflection\": false\n}" },
+        "url": "{{base_url}}/query"
+      }
+    },
+    {
+      "name": "08 — Get Session History",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Session history returned', function () {", "    pm.response.to.have.status(200);", "    var json = pm.response.json();", "    pm.expect(json.exists).to.be.true;", "    console.log('Turns:', json.history.length);", "    json.history.forEach(function(t,i){ console.log(' ['+t.role+']', t.content.substring(0,80)); });", "});"], "type": "text/javascript" } }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "{{base_url}}/session/{{session_id}}"
+      }
+    },
+    {
+      "name": "09 — List My Conversations",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Conversations listed', function () { pm.response.to.have.status(200); console.log('Total:', pm.response.json().total); });"], "type": "text/javascript" } }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "{{base_url}}/session"
+      }
+    },
+    {
+      "name": "10 — Refresh Token",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Token refreshed', function () {", "    pm.response.to.have.status(200);", "    var json = pm.response.json();", "    pm.collectionVariables.set('access_token', json.access_token);", "    console.log('New token:', json.access_token.substring(0,40)+'...');", "});"], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}" },
+        "url": "{{base_url}}/auth/refresh"
+      }
+    },
+    {
+      "name": "11 — Logout",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Logged out', function () {", "    pm.response.to.have.status(200);", "    pm.collectionVariables.set('access_token',  '');", "    pm.collectionVariables.set('refresh_token', '');", "    console.log('Tokens cleared.');", "});"], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "{{base_url}}/auth/logout"
+      }
+    },
+    {
+      "name": "BONUS — Anonymous Query",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Anonymous query works', function () { pm.response.to.have.status(200); var j=pm.response.json(); console.log('session_id:', j.session_id); console.log('Answer:', j.answer.substring(0,200)); });"], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"query\": \"What is photosynthesis?\",\n  \"top_k\": 5,\n  \"use_self_reflection\": false\n}" },
+        "url": "{{base_url}}/query"
+      }
+    },
+    {
+      "name": "BONUS — Clear Session History",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Session cleared', function () { pm.response.to.have.status(200); console.log(pm.response.json().message); });"], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "{{base_url}}/session/{{session_id}}/clear"
+      }
+    }
+  ]
+}

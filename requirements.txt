@@ -23,6 +23,11 @@ flashrank
 rank-bm25
 ragas
 datasets
+passlib[bcrypt]
+python-jose[cryptography]
+pydantic-settings
+bcrypt
+httpx
 
 
 
