@@ -28,6 +28,7 @@ python-jose[cryptography]
 pydantic-settings
 bcrypt
 httpx
-
+prometheus-fastapi-instrumentator
+prometheus-client
 
 

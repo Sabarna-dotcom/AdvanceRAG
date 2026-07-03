@@ -221,6 +221,32 @@ async def query(
         f"session_id={session_id}"
     )
 
+    # ---- Record Prometheus metrics ----
+    try:
+        from src.monitoring.metrics import (
+            QUERY_TOTAL, QUERY_DURATION, QUERY_ITERATIONS,
+            QUERY_CITED_SOURCES, CACHE_HITS, CACHE_MISSES,
+        )
+        collection_label = request.collection or "all"
+        elapsed = time.time() - start_time
+
+        QUERY_TOTAL.labels(
+            collection=collection_label,
+            has_answer=str(result["has_answer"]).lower(),
+            cached=str(result.get("cached", False)).lower(),
+        ).inc()
+
+        QUERY_DURATION.labels(collection=collection_label).observe(elapsed)
+        QUERY_ITERATIONS.observe(result.get("iterations", 1))
+        QUERY_CITED_SOURCES.observe(len(cited_sources))
+
+        if result.get("cached"):
+            CACHE_HITS.labels(collection=collection_label).inc()
+        else:
+            CACHE_MISSES.labels(collection=collection_label).inc()
+    except Exception:
+        pass  # metrics are non-critical
+
     return QueryResponse(
         answer=result["answer"],
         cited_sources=cited_sources,

@@ -24,6 +24,13 @@ from src.api.middleware.error_handler import (
 from src.utils.exceptions import LLMException, VectorStoreException
 from src.utils.logger import get_logger
 
+# Prometheus instrumentation
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    _PROMETHEUS_AVAILABLE = True
+except ImportError:
+    _PROMETHEUS_AVAILABLE = False
+
 logger = get_logger(__name__)
 
 # ==========================================
@@ -42,6 +49,20 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Prometheus metrics — auto-instruments all HTTP routes
+# Exposes /metrics endpoint for Prometheus scraping
+if _PROMETHEUS_AVAILABLE:
+    Instrumentator(
+        should_group_status_codes=False,
+        should_ignore_untemplated=True,
+        should_respect_env_var=False,
+        should_instrument_requests_inprogress=True,
+        excluded_handlers=["/metrics", "/docs", "/redoc", "/openapi.json"],
+        inprogress_name="rag_http_requests_inprogress",
+        inprogress_labels=True,
+    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+    logger.info("Prometheus metrics instrumentation enabled at /metrics")
 
 # ==========================================
 # CORS Middleware
